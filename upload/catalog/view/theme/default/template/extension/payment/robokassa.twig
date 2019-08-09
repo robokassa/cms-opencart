@@ -1,0 +1,21 @@
+<form action="{{ payment_url }}" method="post">
+	<input type="hidden" name="MrchLogin" value="{{ robokassa_login }}" />
+	<input type="hidden" name="OutSum" value="{{ out_summ }}" />
+	<input type="hidden" name="InvId" value="{{ inv_id }}" />
+	<input type="hidden" name="Desc" value="{{ order_desc }}" />
+	{% if robokassa_fiscal %}
+		<input type="hidden" name="Receipt" value="{{ receipt }}" />
+	{% endif %}
+	<input type="hidden" name="SignatureValue" value="{{ crc }}" />
+	<input type="hidden" name="Shp_item" value="1" />
+	{% if robokassa_test %}
+		<input type="hidden" name="IsTest" value="1" />
+	{% endif %}
+	<input type="hidden" name="IncCurrLabel" value="" />
+	<input type="hidden" name="Culture" value="RU" />
+	<div class="buttons">
+		<div class="pull-right">
+			<input type="submit" value="{{ button_confirm }}" class="btn btn-primary" />
+		</div>
+	</div>
+</form>
