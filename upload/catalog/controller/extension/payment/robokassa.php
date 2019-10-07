@@ -32,14 +32,13 @@ class ControllerExtensionPaymentRobokassa extends Controller
 		$data['inv_id'] = $this->session->data['order_id'];
 
 		$data['order_desc'] = 'Покупка в ' . $this->config->get('config_name');
+		
+		if($order_info['currency_code'] != $this->config->get('payment_robokassa_country')){
+			$data['out_summ_currency'] = $order_info['currency_code'];
+		}
 
-		$rur_code = 'RUB';
-
-		$rur_order_total = $this->currency->convert($order_info['total'], $order_info['currency_code'], $rur_code);
-
-		$data['out_summ'] = $this->currency->format($rur_order_total, $rur_code, $order_info['currency_value'], FALSE);
-
-
+		$data['out_summ'] = $order_info['total'];
+		
 		if ($this->config->get('payment_robokassa_fiscal')) {
 
 			$tax_type = $this->config->get('payment_robokassa_tax_type');
@@ -89,13 +88,18 @@ class ControllerExtensionPaymentRobokassa extends Controller
 			));
 
 			$data['receipt'] = urlencode($data['receipt']);
-
-			$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['receipt'] . ":" . $password_1 . ":Shp_item=1");
-
+			
+			if($data['out_summ_currency']){
+				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $data['receipt'] . ":" . $password_1 . ":Shp_item=1");
+			}else{
+				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['receipt'] . ":" . $password_1 . ":Shp_item=1");
+			}
 		} else {
-
-			$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $password_1 . ":Shp_item=1");
-
+			if($data['out_summ_currency']){
+				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $password_1 . ":Shp_item=1");
+			}else{
+				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $password_1 . ":Shp_item=1");
+			}
 		}
 
 		if ($this->config->get('payment_robokassa_test')) {
