@@ -11,6 +11,8 @@ $_['text_enabled']          = 'Включено';
 $_['text_disabled']         = 'Отключено';
 $_['text_yes']           	= 'Да';
 $_['text_no']            	= 'Нет';
+$_['text_kz']           	= 'Казахстан';
+$_['text_ru']            	= 'Россия';
 
 // Entry
 $_['entry_merch_login']     = 'Идентификатор магазина';
@@ -32,6 +34,7 @@ $_['entry_order_status'] 	= 'Статус заказа после оплаты';
 $_['entry_geo_zone']     	= 'Географическая зона';
 $_['entry_status']       	= 'Статус';
 $_['entry_sort_order']   	= 'Порядок сортировки';
+$_['entry_country']   	= 'Страна магазина';
 
 // Help
 
