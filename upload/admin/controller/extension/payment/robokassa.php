@@ -69,6 +69,8 @@ class ControllerExtensionPaymentRobokassa extends Controller {
 		$data['entry_fiscal'] = $this->language->get('entry_fiscal');
 		$data['text_yes'] = $this->language->get('text_yes');
 		$data['text_no'] = $this->language->get('text_no');
+		$data['text_kz'] = $this->language->get('text_kz');
+		$data['text_ru'] = $this->language->get('text_ru');
 
 		$data['entry_login'] = $this->language->get('entry_login');
 		$data['entry_password1'] = $this->language->get('entry_password1');
@@ -83,6 +85,7 @@ class ControllerExtensionPaymentRobokassa extends Controller {
 		$data['entry_geo_zone'] = $this->language->get('entry_geo_zone');
 		$data['entry_status'] = $this->language->get('entry_status');
 		$data['entry_sort_order'] = $this->language->get('entry_sort_order');
+		$data['entry_country'] = $this->language->get('entry_country');
 		
 		$data['help_fiscal'] = $this->language->get('help_fiscal');
 		$data['action'] = $this->url->link('extension/payment/robokassa', 'user_token=' . $this->session->data['user_token'], true);
@@ -127,6 +130,12 @@ class ControllerExtensionPaymentRobokassa extends Controller {
 			$data['payment_robokassa_test'] = $this->request->post['payment_robokassa_test'];
 		} else {
 			$data['payment_robokassa_test'] = $this->config->get('payment_robokassa_test');
+		}
+		
+		if (isset($this->request->post['payment_robokassa_country'])) {
+			$data['payment_robokassa_country'] = $this->request->post['payment_robokassa_country'];
+		} else {
+			$data['payment_robokassa_country'] = $this->config->get('payment_robokassa_country');
 		}
 		
 		$data['robokassa_tax_type_list'] = array(
