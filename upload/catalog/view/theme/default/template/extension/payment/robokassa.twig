@@ -3,6 +3,9 @@
 	<input type="hidden" name="OutSum" value="{{ out_summ }}" />
 	<input type="hidden" name="InvId" value="{{ inv_id }}" />
 	<input type="hidden" name="Desc" value="{{ order_desc }}" />
+	{% if out_summ_currency %}
+		<input type="hidden" name="OutSumCurrency" value="{{ out_summ_currency }}" />
+	{% endif %}
 	{% if robokassa_fiscal %}
 		<input type="hidden" name="Receipt" value="{{ receipt }}" />
 	{% endif %}
