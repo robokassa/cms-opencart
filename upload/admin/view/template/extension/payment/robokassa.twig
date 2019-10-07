@@ -126,6 +126,22 @@
 						</div>
 					</div>
 					<div class="form-group">
+						<label class="col-sm-2 control-label" for="input-order-country">
+							<span>{{ entry_country }}</span>
+						</label>
+						<div class="col-sm-10">
+							<select name="payment_robokassa_country" id="input-country" class="form-control">
+								{% if payment_robokassa_country == 'RUB' %}
+									<option value="RUB" selected="selected">{{ text_ru }}</option>
+									<option value="KZT">{{ text_kz }}</option>
+								{% elseif payment_robokassa_country == 'KZT' %}
+									<option value="RUB">{{ text_ru }}</option>
+									<option value="KZT" selected="selected">{{ text_kz }}</option>
+								{% endif %}
+							</select>
+						</div>
+					</div>
+					<div class="form-group">
 						<label class="col-sm-2 control-label" for="input-order-fiscal">
 							<span data-toggle="tooltip" title="{{ help_fiscal }}">{{ entry_fiscal }}</span>
 						</label>
@@ -240,6 +256,27 @@
 	</div>
 </div>
 <script>
+	{% if payment_robokassa_country == 'KZT' %}
+		$('#input-fiscal').attr('disabled','true');
+	{% endif %}
+	
+	$('#input-country').on(
+		'change',
+		function ()
+		{
+			if ($(this).val() == 'KZT')
+			{
+				$("#input-fiscal option[value='0']").prop('selected', true);
+				$('.hidden-fiscal').hide();
+				$('#input-fiscal').attr('disabled','true');
+			}
+			else
+			{
+				$('#input-fiscal').removeAttr('disabled');
+			}
+		}
+	);
+	
 	$('#input-fiscal').on(
 		'change',
 		function ()
