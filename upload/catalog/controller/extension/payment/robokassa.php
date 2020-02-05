@@ -33,11 +33,14 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
 		$data['order_desc'] = 'Покупка в ' . $this->config->get('config_name');
 		
-		if($order_info['currency_code'] != $this->config->get('payment_robokassa_country')){
+		if($order_info['currency_code'] != $this->config->get('payment_robokassa_country') && $order_info['currency_code'] != 'RUB'){
 			$data['out_summ_currency'] = $order_info['currency_code'];
 		}
-
-		$data['out_summ'] = $order_info['total'];
+		
+		$data['out_summ'] = $this->currency->format($order_info['total'], $order_info['currency_code']);
+		$data['out_summ'] = str_ireplace(" ", "", $data['out_summ']);
+		$data['out_summ'] = preg_replace('/[^0-9 , .]/', '', $data['out_summ']);
+		$data['out_summ'] = (float)$data['out_summ'];
 		
 		if ($this->config->get('payment_robokassa_fiscal')) {
 
@@ -89,13 +92,13 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
 			$data['receipt'] = urlencode($data['receipt']);
 			
-			if($data['out_summ_currency']){
+			if(isset($data['out_summ_currency'])){
 				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $data['receipt'] . ":" . $password_1 . ":Shp_item=1");
 			}else{
 				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['receipt'] . ":" . $password_1 . ":Shp_item=1");
 			}
 		} else {
-			if($data['out_summ_currency']){
+			if(isset($data['out_summ_currency'])){
 				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $password_1 . ":Shp_item=1");
 			}else{
 				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $password_1 . ":Shp_item=1");
@@ -106,6 +109,12 @@ class ControllerExtensionPaymentRobokassa extends Controller
 			$data['robokassa_test'] = '1';
 		} else {
 			$data['robokassa_test'] = '0';
+		}
+		
+		if ($this->config->get('payment_robokassa_status_iframe')) {
+			$data['robokassa_status_iframe'] = 1;
+		} else {
+			$data['robokassa_status_iframe'] = 0;
 		}
 
 

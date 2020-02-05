@@ -86,8 +86,11 @@ class ControllerExtensionPaymentRobokassa extends Controller {
 		$data['entry_status'] = $this->language->get('entry_status');
 		$data['entry_sort_order'] = $this->language->get('entry_sort_order');
 		$data['entry_country'] = $this->language->get('entry_country');
+		$data['entry_iframe'] = $this->language->get('entry_iframe');
 		
 		$data['help_fiscal'] = $this->language->get('help_fiscal');
+		$data['help_iframe'] = $this->language->get('help_iframe');
+		
 		$data['action'] = $this->url->link('extension/payment/robokassa', 'user_token=' . $this->session->data['user_token'], true);
 		
 		$data['cancel'] = $this->url->link('marketplace/extension', 'user_token=' . $this->session->data['user_token'].'&type=payment', true);
@@ -134,8 +137,10 @@ class ControllerExtensionPaymentRobokassa extends Controller {
 		
 		if (isset($this->request->post['payment_robokassa_country'])) {
 			$data['payment_robokassa_country'] = $this->request->post['payment_robokassa_country'];
-		} else {
+		} elseif($this->config->get('payment_robokassa_country')) {
 			$data['payment_robokassa_country'] = $this->config->get('payment_robokassa_country');
+		}else{
+			$data['payment_robokassa_country'] = "RUB";
 		}
 		
 		$data['robokassa_tax_type_list'] = array(
@@ -238,6 +243,12 @@ class ControllerExtensionPaymentRobokassa extends Controller {
 			$data['payment_robokassa_status'] = $this->request->post['payment_robokassa_status'];
 		} else {
 			$data['payment_robokassa_status'] = $this->config->get('payment_robokassa_status');
+		}
+		
+		if (isset($this->request->post['payment_robokassa_status_iframe'])) {
+			$data['payment_robokassa_status_iframe'] = $this->request->post['payment_robokassa_status_iframe'];
+		} else {
+			$data['payment_robokassa_status_iframe'] = $this->config->get('payment_robokassa_status_iframe');
 		}
 		
 		if (isset($this->request->post['payment_robokassa_sort_order'])) {
