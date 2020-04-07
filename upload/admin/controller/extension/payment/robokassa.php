@@ -1,4 +1,5 @@
 <?php
+
 class ControllerExtensionPaymentRobokassa extends Controller {
 	private $error = array();
 	

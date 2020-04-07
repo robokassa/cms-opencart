@@ -2,7 +2,7 @@
 <script type="text/javascript" src="https://auth.robokassa.ru/Merchant/bundle/robokassa_iframe.js"></script>
 <div class="buttons">
 	<div class="pull-right">
-		<input type="submit" value="{{ button_confirm }}" class="btn btn-primary" onclick="Robokassa.StartPayment({MerchantLogin: '{{ robokassa_login }}',	OutSum: '{{ out_summ }}', InvId: '{{ inv_id }}', Description: '{{ order_desc }}', {% if out_summ_currency %} OutSumCurrency: '{{ out_summ_currency }}', {% endif %} {% if robokassa_fiscal %} Receipt: '{{ receipt }}', {% endif %} SignatureValue: '{{ crc }}', Shp_item: '1', Culture: 'ru'})">
+		<input type="submit" value="{{ button_confirm }}" class="btn btn-primary" onclick="Robokassa.StartPayment({MerchantLogin: '{{ robokassa_login }}',	OutSum: '{{ out_summ }}', InvId: '{{ inv_id }}', Description: '{{ order_desc }}', {% if out_summ_currency %} OutSumCurrency: '{{ out_summ_currency }}', {% endif %} {% if robokassa_fiscal %} Receipt: '{{ receipt }}', {% endif %} SignatureValue: '{{ crc }}', Shp_item: '1', Shp_label: 'official_opencart', Culture: 'ru'})">
 	</div>
 </div>
 {% else %}
@@ -19,6 +19,8 @@
 	{% endif %}
 	<input type="hidden" name="SignatureValue" value="{{ crc }}" />
 	<input type="hidden" name="Shp_item" value="1" />
+	<input type="hidden" name="Shp_label" value="official_opencart" />
+
 	{% if robokassa_test %}
 		<input type="hidden" name="IsTest" value="1" />
 	{% endif %}
