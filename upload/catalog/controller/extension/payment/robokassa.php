@@ -54,7 +54,6 @@ class ControllerExtensionPaymentRobokassa extends Controller
 			$items = [];
 
 			foreach ($this->cart->getProducts() as $product) {
-
 				$items[] = [
 					'name' => utf8_substr(trim(htmlspecialchars($product['name'])), 0, 63),
 					//'name'     => htmlspecialchars($product['name']),
@@ -218,5 +217,11 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
 		}
 
+	}
+	
+	public function test(){
+		$this->load->model('extension/payment/robokassa');
+					
+		$this->model_extension_payment_robokassa->sendSecondCheck(82);
 	}
 }
