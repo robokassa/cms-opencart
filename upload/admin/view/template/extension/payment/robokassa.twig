@@ -214,6 +214,22 @@
 							</select>
 						</div>
 					</div>
+					<div class="form-group hidden-fiscal" {% if not payment_robokassa_fiscal %}style="display:none"{% endif %}>
+						<label class="col-sm-2 control-label"
+						       for="input-status_id-check2"><span data-toggle="tooltip" title="Если Вам необходимо отправлять второй чек, выберите статус заказа, при котором будет осуществлена отправка">Статус заказа второй чек</span></label>
+						<div class="col-sm-10">
+							<select name="payment_robokassa_order_status_id_2check" id="input-status_id-check2" class="form-control">
+									<option value="0">Не выбрано</option>
+								{% for order_status in order_statuses %}
+									{% if order_status.order_status_id == payment_robokassa_order_status_id_2check %}
+										<option value="{{ order_status.order_status_id }}" selected="selected">{{ order_status.name }}</option>
+									{% else %}
+										<option value="{{ order_status.order_status_id }}">{{ order_status.name }}</option>
+									{% endif %}
+								{% endfor %}
+							</select>
+						</div>
+					</div>
 					<div class="form-group">
 						<label class="col-sm-2 control-label" for="input-geo-zone">{{ entry_geo_zone }}</label>
 						<div class="col-sm-10">

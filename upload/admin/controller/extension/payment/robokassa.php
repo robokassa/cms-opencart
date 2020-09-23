@@ -126,9 +126,15 @@ class ControllerExtensionPaymentRobokassa extends Controller {
 			$data['payment_robokassa_test_password_2'] = $this->config->get('payment_robokassa_test_password_2');
 		}
 		
-		$data['payment_robokassa_result_url'] 		= HTTP_CATALOG . 'index.php?route=extension/payment/robokassa/result';
-		$data['payment_robokassa_success_url'] 	= HTTP_CATALOG . 'index.php?route=extension/payment/robokassa/success';
-		$data['payment_robokassa_fail_url'] 		= HTTP_CATALOG . 'index.php?route=extension/payment/robokassa/fail';
+		if(!empty($_SERVER['HTTPS']) && 'off' !== strtolower($_SERVER['HTTPS'])) {
+			$data['payment_robokassa_result_url'] 		= 'https://' . $_SERVER['SERVER_NAME'] . '/index.php?route=extension/payment/robokassa/result';
+			$data['payment_robokassa_success_url'] 	= 'https://' . $_SERVER['SERVER_NAME'] . '/index.php?route=extension/payment/robokassa/success';
+			$data['payment_robokassa_fail_url'] 		= 'https://' . $_SERVER['SERVER_NAME'] . '/index.php?route=extension/payment/robokassa/fail';
+		}else{
+			$data['payment_robokassa_result_url'] 		= HTTP_CATALOG . 'index.php?route=extension/payment/robokassa/result';
+			$data['payment_robokassa_success_url'] 	= HTTP_CATALOG . 'index.php?route=extension/payment/robokassa/success';
+			$data['payment_robokassa_fail_url'] 		= HTTP_CATALOG . 'index.php?route=extension/payment/robokassa/fail';
+		}
 		
 		if (isset($this->request->post['payment_robokassa_test'])) {
 			$data['payment_robokassa_test'] = $this->request->post['payment_robokassa_test'];
@@ -222,6 +228,12 @@ class ControllerExtensionPaymentRobokassa extends Controller {
 			$data['payment_robokassa_order_status_id'] = $this->request->post['payment_robokassa_order_status_id'];
 		} else {
 			$data['payment_robokassa_order_status_id'] = $this->config->get('payment_robokassa_order_status_id'); 
+		}
+		
+		if (isset($this->request->post['payment_robokassa_order_status_id_2check'])) {
+			$data['payment_robokassa_order_status_id_2check'] = $this->request->post['payment_robokassa_order_status_id_2check'];
+		} else {
+			$data['payment_robokassa_order_status_id_2check'] = $this->config->get('payment_robokassa_order_status_id_2check'); 
 		}
 		
 		$this->load->model('localisation/order_status');
