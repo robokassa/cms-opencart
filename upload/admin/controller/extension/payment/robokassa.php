@@ -163,9 +163,9 @@ class ControllerExtensionPaymentRobokassa extends Controller {
 			'none' => 'без НДС',
 			'vat0' => 'НДС по ставке 0%',
 			'vat10' => 'НДС чека по ставке 10%',
-			'vat18' => 'НДС чека по ставке 18%',
+			'vat20' => 'НДС чека по ставке 20%',
 			'vat110' => 'НДС чека по расчетной ставке 10/110',
-			'vat118' => 'НДС чека по расчетной ставке 18/118',
+			'vat120' => 'НДС чека по расчетной ставке 20/120',
 		);
 		
 		$data['robokassa_payment_method_list'] = array(
