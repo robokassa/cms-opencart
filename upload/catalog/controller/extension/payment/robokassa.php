@@ -4,7 +4,6 @@ class ControllerExtensionPaymentRobokassa extends Controller
 {
 	public function index()
 	{
-
 		$data['button_confirm'] = $this->language->get('button_confirm');
 
 		$this->load->model('checkout/order');
@@ -38,6 +37,13 @@ class ControllerExtensionPaymentRobokassa extends Controller
 		}
 
 		$data['out_summ'] = (float) $this->currency->format($order_info['total'], $order_info['currency_code'], false, false);
+
+		$customer_language_id = $this->config->get('config_language_id');
+		$languages_map = $this->config->get('payment_robokassa_languages_map');
+
+		$language = isset($languages_map[$customer_language_id]) ? $languages_map[$customer_language_id] : 'ru';
+
+		$data['culture'] = $language;
 
 		if ($this->config->get('payment_robokassa_fiscal')) {
 
