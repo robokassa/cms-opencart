@@ -32,16 +32,13 @@ class ControllerExtensionPaymentRobokassa extends Controller
 		$data['inv_id'] = $this->session->data['order_id'];
 
 		$data['order_desc'] = 'Покупка в ' . $this->config->get('config_name');
-		
+
 		if($order_info['currency_code'] != $this->config->get('payment_robokassa_country') && $order_info['currency_code'] != 'RUB'){
 			$data['out_summ_currency'] = $order_info['currency_code'];
 		}
-		
-		$data['out_summ'] = $this->currency->format($order_info['total'], $order_info['currency_code']);
-		$data['out_summ'] = str_ireplace(" ", "", $data['out_summ']);
-		$data['out_summ'] = preg_replace('/[^0-9 , .]/', '', $data['out_summ']);
-		$data['out_summ'] = (float)$data['out_summ'];
-		
+
+		$data['out_summ'] = (float) $this->currency->format($order_info['total'], $order_info['currency_code'], false, false);
+
 		if ($this->config->get('payment_robokassa_fiscal')) {
 
 			$tax_type = $this->config->get('payment_robokassa_tax_type');
@@ -90,7 +87,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 			));
 
 			$data['receipt'] = urlencode($data['receipt']);
-			
+
 			if(isset($data['out_summ_currency'])){
 				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $data['receipt'] . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
 			}else{
@@ -109,7 +106,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 		} else {
 			$data['robokassa_test'] = '0';
 		}
-		
+
 		if ($this->config->get('payment_robokassa_status_iframe')) {
 			$data['robokassa_status_iframe'] = 1;
 		} else {
@@ -218,10 +215,10 @@ class ControllerExtensionPaymentRobokassa extends Controller
 		}
 
 	}
-	
+
 	public function test(){
 		$this->load->model('extension/payment/robokassa');
-					
+
 		$this->model_extension_payment_robokassa->sendSecondCheck(82);
 	}
 }
