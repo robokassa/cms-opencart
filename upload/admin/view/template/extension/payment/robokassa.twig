@@ -159,7 +159,7 @@
 					</div>
 					<div class="form-group hidden-fiscal" {% if not payment_robokassa_fiscal %}style="display:none"{% endif %} >
 						<label class="col-sm-2 control-label"
-						       for="input-order-tax-type">{{ entry_tax_type }}</label>
+							   for="input-order-tax-type">{{ entry_tax_type }}</label>
 						<div class="col-sm-10">
 							<select name="payment_robokassa_tax_type" id="input-tax-type" class="form-control">
 								{% for key,value in robokassa_tax_type_list %}
@@ -173,19 +173,29 @@
 						</div>
 					</div>
 					<div class="form-group hidden-fiscal" {% if not payment_robokassa_fiscal %}style="display:none"{% endif %} >
-						<label class="col-sm-2 control-label" for="input-order-tax">{{ entry_tax }}</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_tax" id="input-tax" class="form-control">
-								{% for key,value in robokassa_tax_list %}
-									{% if payment_robokassa_tax == key %}
-										<option value="{{ key }}" selected="selected">{{ value }}</option>
-									{% else %}
-										<option value="{{ key }}">{{ value }}</option>
-									{% endif %}
-								{% endfor %}
-							</select>
-						</div>
+					<label class="col-sm-2 control-label" for="input-order-tax">{{ entry_tax }}</label>
+					<div class="col-sm-10">
+						<select name="payment_robokassa_tax" id="input-tax" class="form-control">
+							{% if payment_robokassa_country == 'RUB' %}
+							{% for key,value in robokassa_tax_list %}
+								{% if payment_robokassa_tax == key %}
+									<option value="{{ key }}" selected="selected">{{ value }}</option>
+								{% else %}
+									<option value="{{ key }}">{{ value }}</option>
+								{% endif %}
+							{% endfor %}
+							{% elseif payment_robokassa_country == 'KZT' %}
+							{% for key,value in robokassa_tax_list_kz %}
+								{% if payment_robokassa_tax == key %}
+									<option value="{{ key }}" selected="selected">{{ value }}</option>
+								{% else %}
+									<option value="{{ key }}">{{ value }}</option>
+								{% endif %}
+							{% endfor %}
+							{% endif %}
+						</select>
 					</div>
+			</div>
 					<div class="form-group hidden-fiscal" {% if not payment_robokassa_fiscal %}style="display:none"{% endif %} >
 						<label class="col-sm-2 control-label" for="input-order-payment-method">{{ entry_payment_method }}</label>
 						<div class="col-sm-10">
@@ -286,26 +296,38 @@
 		</div>
 	</div>
 </div>
+
 <script>
-	{% if payment_robokassa_country == 'KZT' %}
-		$('#input-fiscal').attr('disabled','true');
-	{% endif %}
-	
+		{% if payment_robokassa_country == 'KZT' %}
+		$('#input-tax-type').attr('disabled','true');
+		$('#input-status_id-check2').attr('disabled','true');
+		$('#input-payment-object').attr('disabled','true');
+		$('#input-payment-method').attr('disabled','true');
+		{% endif %}
+
 	$('#input-country').on(
-		'change',
-		function ()
-		{
-			if ($(this).val() == 'KZT')
+			'change',
+			function ()
 			{
-				$("#input-fiscal option[value='0']").prop('selected', true);
-				$('.hidden-fiscal').hide();
-				$('#input-fiscal').attr('disabled','true');
+				if ($(this).val() == 'KZT')
+				{
+					$('.input-tax-type').hide();
+					$('#input-tax-type').attr('disabled','true');
+					$('.input-status_id-check2').hide();
+					$('#input-status_id-check2').attr('disabled','true');
+					$('.input-payment-object').hide();
+					$('#input-payment-object').attr('disabled','true');
+					$('.input-payment-method').hide();
+					$('#input-payment-method').attr('disabled','true');
+				}
+				else
+				{
+					$('#input-tax-type').removeAttr('disabled');
+					$('#input-status_id-check2').removeAttr('disabled');
+					$('#input-payment-object').removeAttr('disabled');
+					$('#input-payment-method').removeAttr('disabled');
+				}
 			}
-			else
-			{
-				$('#input-fiscal').removeAttr('disabled');
-			}
-		}
 	);
 	
 	$('#input-fiscal').on(

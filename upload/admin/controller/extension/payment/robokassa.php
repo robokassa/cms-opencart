@@ -167,6 +167,12 @@ class ControllerExtensionPaymentRobokassa extends Controller {
 			'vat110' => 'НДС чека по расчетной ставке 10/110',
 			'vat120' => 'НДС чека по расчетной ставке 20/120',
 		);
+
+        $data['robokassa_tax_list_kz'] = array(
+            'none' => 'без НДС',
+            'vat8' => 'НДС чека по ставке 8%',
+            'vat12' => 'НДС чека по ставке 12%',
+        );
 		
 		$data['robokassa_payment_method_list'] = array(
 			'full_prepayment' => 'предоплата 100% (по умолчанию)',
