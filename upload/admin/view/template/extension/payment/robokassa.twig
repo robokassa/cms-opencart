@@ -291,6 +291,22 @@
 							<input type="text" name="payment_robokassa_sort_order" value="{{ payment_robokassa_sort_order }}" placeholder="{{ entry_sort_order }}" id="input-sort-order" class="form-control" />
 						</div>
 					</div>
+
+					<div class="form-group">
+						<label class="col-sm-2 control-label">{{ entry_languages_map }}</label>
+						<div class="col-sm-10">
+							{% for language in opencart_languages %}
+								<div>
+									<select class="form-control"
+											name="payment_robokassa_languages_map[{{ language.language_id }}]">
+										{% for robokassa_language in robokassa_available_languages %}
+											<option {% if payment_robokassa_languages_map[language.language_id] == robokassa_language %}selected{% endif %}>{{ robokassa_language }}</option>
+										{% endfor %}
+									</select>
+								</div>
+							{% endfor %}
+						</div>
+					</div>
 				</form>
 			</div>
 		</div>

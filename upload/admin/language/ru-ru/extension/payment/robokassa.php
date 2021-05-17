@@ -6,7 +6,7 @@ $_['heading_title']   	 	= 'Робокасса';
 $_['text_payment']      	= 'Оплата';
 $_['text_success']       	= 'Настройки модуля оплаты Робокасса обновлены!';
 $_['text_robokassa'] 		= '<a target="_blank" href="https://robokassa.ru/"><img src="/admin/view/image/payment/robokassa.png" alt="robokassa" style="max-width:140px" /></a>';
-$_['text_edit']      	    = 'Редактирование Робокасса';
+$_['text_edit']      	    = 'Редактирование модуля "Робокасса"';
 $_['text_enabled']          = 'Включено';
 $_['text_disabled']         = 'Отключено';
 $_['text_yes']           	= 'Да';
@@ -36,9 +36,10 @@ $_['entry_status']       	= 'Статус';
 $_['entry_sort_order']   	= 'Порядок сортировки';
 $_['entry_country']   		= 'Страна магазина';
 $_['entry_iframe']   		= 'Включить iframe';
+$_['entry_languages_map']   = 'Язык интерфейса платёжной страницы';
 
 // Help
-$_['help_iframe']         	= 'При включённом iframe, способов оплаты меньше, чем в обычной платежной странице - только карты, Apple и Samsung pay, Qiwi. incurlabel работает, но ограничено.';
+$_['help_iframe']         	= 'При включённом iframe, способов оплаты меньше, чем в обычной платежной странице - только карты, Apple и Samsung pay, Qiwi. IncCurrLabel работает, но ограничено.';
 $_['help_fiscal']         	= 'Режим работы для решений - Облачное. Кассовое. Робочеки.';
 $_['help_test']         	= 'Режим для отладки модуля. Информацию можно посмотреть в файле storage/logs/robo.log';
 
