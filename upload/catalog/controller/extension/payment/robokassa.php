@@ -11,17 +11,26 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         $order_info = $this->model_checkout_order->getOrder($this->session->data['order_id']);
 
+        $ruUrl = 'https://auth.robokassa.ru/Merchant/Index.aspx';
+        $kzUrl = 'https://auth.robokassa.kz/Merchant/Index.aspx';
+
+        if ($this->config->get('payment_robokassa_country') == 'RUB') {
+            $paymentUrl = $ruUrl;
+        } else {
+            $paymentUrl = $kzUrl;
+        }
+
         if ($this->config->get('payment_robokassa_test')) {
 
             $password_1 = $this->config->get('payment_robokassa_test_password_1');
             $password_2 = $this->config->get('payment_robokassa_test_password_2');
-            $data['payment_url'] = 'https://merchant.roboxchange.com/Index.aspx';
+            $data['payment_url'] = $paymentUrl;
 
         } else {
 
             $password_1 = $this->config->get('payment_robokassa_password_1');
             $password_2 = $this->config->get('payment_robokassa_password_2');
-            $data['payment_url'] = 'https://auth.robokassa.ru/Merchant/Index.aspx';
+            $data['payment_url'] = $paymentUrl;
 
         }
 
@@ -40,11 +49,11 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $data['out_summ'] = (float) $this->currency->format($order_info['total'], $order_info['currency_code'], false, false);
 
         $customer_language_id = $this->config->get('config_language_id');
-		$languages_map = $this->config->get('payment_robokassa_languages_map');
+        $languages_map = $this->config->get('payment_robokassa_languages_map');
 
-		$language = isset($languages_map[$customer_language_id]) ? $languages_map[$customer_language_id] : 'ru';
+        $language = isset($languages_map[$customer_language_id]) ? $languages_map[$customer_language_id] : 'ru';
 
-		$data['culture'] = $language;
+        $data['culture'] = $language;
 
         if ($this->config->get('payment_robokassa_fiscal')) {
 
@@ -112,6 +121,15 @@ class ControllerExtensionPaymentRobokassa extends Controller
             $data['robokassa_test'] = '1';
         } else {
             $data['robokassa_test'] = '0';
+        }
+
+        $ruIframeUrl = "https://auth.robokassa.ru/Merchant/bundle/robokassa_iframe.js";
+        $kzIframeUrl = "https://auth.robokassa.kz/Merchant/bundle/robokassa_iframe.js";
+
+        if ($this->config->get('payment_robokassa_country') == 'RUB') {
+            $data['iframeUrl'] = $ruIframeUrl;
+        } else {
+            $data['iframeUrl'] = $kzIframeUrl;
         }
 
         if ($this->config->get('payment_robokassa_status_iframe')) {
