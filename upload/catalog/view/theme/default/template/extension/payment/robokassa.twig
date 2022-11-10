@@ -1,5 +1,5 @@
 {% if robokassa_status_iframe %}
-    <script type="text/javascript" src="https://auth.robokassa.ru/Merchant/bundle/robokassa_iframe.js"></script>
+    <script type="text/javascript" src="{{ iframeUrl }}"></script>
     <div class="buttons">
         <div class="pull-right">
             <input type="submit" value="{{ button_confirm }}" class="btn btn-primary"
