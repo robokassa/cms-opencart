@@ -70,7 +70,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
                 $items[] = [
                     'name' => utf8_substr(trim(htmlspecialchars($product['name'])), 0, 63),
                     //'name'     => htmlspecialchars($product['name']),
-                    'sum' => $this->currency->format($product['price'] * $product['quantity'], 'RUB', false, false),
+                    'cost' => $this->currency->format($product['price'], 'RUB', false, false),
                     'quantity' => $product['quantity'],
                     'payment_method' => $payment_method,
                     'payment_object' => $payment_object,
@@ -86,7 +86,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
                     $items[] = [
                         'name' => utf8_substr(trim(htmlspecialchars($shipping_name)), 0, 63),
-                        'sum' => $this->currency->format($shipping_price, 'RUB', false, false),
+                        'cost' => $this->currency->format($shipping_price, 'RUB', false, false),
                         'quantity' => 1,
                         'tax' => $tax,
                         'payment_method' => $payment_method,
