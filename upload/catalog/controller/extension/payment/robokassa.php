@@ -216,6 +216,8 @@ class ControllerExtensionPaymentRobokassa extends Controller
             $order_info = $this->model_checkout_order->getOrder($order_id);
             $new_order_status_id = $this->config->get('payment_robokassa_order_status_id');
 
+            echo 'OK' . $this->request->post["InvId"];
+
             if ($order_info['order_status_id'] == 0) {
                 $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id);
             }
