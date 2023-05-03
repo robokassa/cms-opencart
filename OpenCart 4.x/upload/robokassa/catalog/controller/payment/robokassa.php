@@ -58,6 +58,10 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $data['culture'] = $language;
 
+        $order_product['quantity'] =  $this->model_checkout_order->getOrder($order_info['order_id']);
+
+        $order_product['price'] = $this->model_checkout_order->getOrder($order_info['order_id']);
+
         if ($this->config->get('payment_robokassa_fiscal')) {
 
             $tax_type = $this->config->get('payment_robokassa_tax_type');
@@ -69,12 +73,34 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
             $items = [];
 
-            foreach ($this->cart->getProducts() as $product) {
+            $discount = 0;
+            foreach ($this->model_checkout_order->getTotals($order_info['order_id']) as $row) {
+                if ($row['value'] < 0) {
+                    $discount = abs($row['value']);
+                }
+            };
+
+            $total_price = 0;
+            $order_products = $this->model_checkout_order->getOrder($order_info['order_id']);
+
+            foreach ($this->cart->getProducts() as $order_product) {
+                $total_price += $order_product['price'] * $order_product['quantity'];
+            }
+
+            $discount_percent = ($discount / $total_price)  ; // процент скидки на каждый товар
+
+            foreach ($this->cart->getProducts() as $order_product) {
+                $item_price = $order_product['price'] / $order_product['quantity'] ;
+
+                // вычисляем стоимость скидки для каждого товара
+                $item_discount = round($item_price * $discount_percent, 2);
+                $item_price -= $item_discount;
+
                 $items[] = [
-                    'name' => trim(htmlspecialchars($product['name'])), 0, 63,
+                    'name' => trim(htmlspecialchars($order_product['name'])), 0, 63,
                     //'name'     => htmlspecialchars($product['name']),
-                    'cost' => $this->currency->format($product['price'], 'RUB', false, false),
-                    'quantity' => $product['quantity'],
+                    'cost' => round($item_price, 2)   ,
+                    'quantity' => $order_product['quantity'],
                     'payment_method' => $payment_method,
                     'payment_object' => $payment_object,
                     'tax' => $tax
@@ -149,7 +175,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         return $this->load->view('extension/robokassa/payment/robokassa', $data);
     }
-    
+
     public function test()
     {
         $this->load->model('extension/robokassa/payment/robokassa');
