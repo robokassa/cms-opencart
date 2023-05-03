@@ -8,8 +8,10 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $data['button_confirm'] = $this->language->get('button_confirm');
 
         $this->load->model('checkout/order');
+        $this->load->model('account/order');
 
         $order_info = $this->model_checkout_order->getOrder($this->session->data['order_id']);
+
 
         $ruUrl = 'https://auth.robokassa.ru/Merchant/Index.aspx';
         $kzUrl = 'https://auth.robokassa.kz/Merchant/Index.aspx';
@@ -55,6 +57,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         $data['culture'] = $language;
 
+
         if ($this->config->get('payment_robokassa_fiscal')) {
 
             $tax_type = $this->config->get('payment_robokassa_tax_type');
@@ -66,12 +69,33 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
             $items = [];
 
-            foreach ($this->cart->getProducts() as $product) {
+            $discount = 0;
+            foreach ($this->model_checkout_order->getOrderTotals($order_info['order_id']) as $row) {
+                if ($row['value'] < 0) {
+                    $discount = abs($row['value']);
+                }
+            };
+
+            $total_price = 0;
+            $order_products = $this->model_account_order->getOrderProducts($order_info['order_id']);
+
+            foreach ($order_products as $order_product) {
+                $total_price += $order_product['price'] * $order_product['quantity'];
+            }
+
+            $discount_percent = $discount / $total_price; // процент скидки на каждый товар
+
+            foreach ($order_products as $order_product) {
+                $item_price = $order_product['price'];
+
+                // вычисляем стоимость скидки для каждого товара
+                $item_discount = round($item_price * $discount_percent, 2);
+                $item_price -= $item_discount;
+
                 $items[] = [
-                    'name' => utf8_substr(trim(htmlspecialchars($product['name'])), 0, 63),
-                    //'name'     => htmlspecialchars($product['name']),
-                    'cost' => $this->currency->format($product['price'], 'RUB', false, false),
-                    'quantity' => $product['quantity'],
+                    'name' => utf8_substr(trim(htmlspecialchars($order_product['name'])), 0, 63),
+                    'cost' => round($item_price, 2),
+                    'quantity' => $order_product['quantity'],
                     'payment_method' => $payment_method,
                     'payment_object' => $payment_object,
                     'tax' => $tax
@@ -102,6 +126,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
             ));
 
+
             $data['receipt'] = urlencode($data['receipt']);
 
             if (isset($data['out_summ_currency'])) {
@@ -122,6 +147,9 @@ class ControllerExtensionPaymentRobokassa extends Controller
         } else {
             $data['robokassa_test'] = '0';
         }
+
+
+
 
         $ruIframeUrl = "https://auth.robokassa.ru/Merchant/bundle/robokassa_iframe.js";
         $kzIframeUrl = "https://auth.robokassa.kz/Merchant/bundle/robokassa_iframe.js";
