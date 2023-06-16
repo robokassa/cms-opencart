@@ -44,6 +44,12 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         $data['order_desc'] = 'Покупка в ' . $this->config->get('config_name');
 
+        if (isset($this->session->data['guest']['email'])) {
+            $data['email'] = $this->session->data['guest']['email'];
+        } else {
+            $data['email'] = '';
+        }
+
         if ($order_info['currency_code'] != $this->config->get('payment_robokassa_country') && $order_info['currency_code'] != 'RUB') {
             $data['out_summ_currency'] = $order_info['currency_code'];
         }
