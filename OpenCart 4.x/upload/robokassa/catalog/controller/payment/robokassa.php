@@ -45,6 +45,8 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $data['order_desc'] = 'Покупка в ' . $this->config->get('config_name');
 
+        $data['email'] =  $this->session->data['customer']['email'];
+
         if ($order_info['currency_code'] != $this->config->get('payment_robokassa_country') && $order_info['currency_code'] != 'RUB') {
             $data['out_summ_currency'] = $order_info['currency_code'];
         }
