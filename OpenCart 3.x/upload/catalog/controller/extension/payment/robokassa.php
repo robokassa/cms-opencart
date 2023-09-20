@@ -53,8 +53,15 @@ class ControllerExtensionPaymentRobokassa extends Controller
         if ($order_info['currency_code'] != $this->config->get('payment_robokassa_country') && $order_info['currency_code'] != 'RUB') {
             $data['out_summ_currency'] = $order_info['currency_code'];
         }
+        $bonus_points = 0; // Инициализируем переменную для учета бонусных баллов
 
-        $data['out_summ'] = (float) $this->currency->format($order_info['total'], $order_info['currency_code'], false, false);
+        // Расчет стоимости заказа с учетом бонусных баллов
+         $total_order_cost = $order_info['total'] - $bonus_points;
+         $data['out_summ'] = (float) $this->currency->format($total_order_cost, $order_info['currency_code'], false, false);
+ 
+
+
+        // $data['out_summ'] = (float) $this->currency->format($order_info['total'], $order_info['currency_code'], false, false);
 
         $customer_language_id = $this->config->get('config_language_id');
         $languages_map = $this->config->get('payment_robokassa_languages_map');
