@@ -36,3 +36,20 @@
         </div>
     </form>
 {% endif %}
+
+{% if robokassa_status_podeli %}
+    <body>
+    <div class="alert alert-info">
+        <p>Вы можете воспользоваться способом оплаты "Подели". Этот способ доступен для заказов на сумму от 300 до 35000 руб.</p>
+        <p>Оплата "Подели" позволяет разбить сумму заказа на части и оплатить её частями. Оплата возможна в интернет-банках, салонах связи и других местах.</p>
+    </div>
+    <script type="text/javascript" src="https://auth.robokassa.ru/Merchant/PaymentForm/DirectPayment.js"></script>
+    <div class="buttons">
+        <div class="pull-left">
+            <!-- <button onclick="Robo.directPayment.startOp({MrchLogin: '{{ robokassa_login }}',   IncCurrLabel: '{{ IncCurrLabel }}', Encoding: 'utf-8',  OutSum: '{{ out_summ }}', Description: '{{ order_desc }}',  SignatureValue: '{{ crc }}',  Culture: '{{ culture }}'})" >ОплатитьПодели</button> -->
+            <button onclick="Robo.directPayment.startOp({MrchLogin: '{{ robokassa_login }}',   IncCurrLabel: '{{ IncCurrLabel }}', InvId: '{{ inv_id }}',  Encoding: 'utf-8', {% if robokassa_fiscal %} Receipt: '{{ receipt }}', {% endif %} OutSum: '{{ out_summ }}', Description: '{{ order_desc }}',  SignatureValue: '{{ crc }}', Shp_item: '1', Shp_label: 'official_opencart',  Culture: '{{ culture }}'})" >Оплатить Подели</button>
+        </div>
+    </div>
+    </body>
+    </html>
+{% endif %}

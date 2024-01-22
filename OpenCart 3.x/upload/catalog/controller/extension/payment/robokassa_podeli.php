@@ -1,6 +1,6 @@
 <?php
 
-class ControllerExtensionPaymentRobokassa extends Controller
+class ControllerExtensionPaymentRobokassaPodeli extends Controller
 {
     public function index()
     {
@@ -162,147 +162,13 @@ class ControllerExtensionPaymentRobokassa extends Controller
         }
 
 
+        /*        if ($this->config->get('payment_robokassa_status_iframe')) {
+                    $data['robokassa_status_iframe'] = 1;
+                } else {
+                    $data['robokassa_status_iframe'] = 0;
+                }*/
 
-
-        $ruIframeUrl = "https://auth.robokassa.ru/Merchant/bundle/robokassa_iframe.js";
-        $kzIframeUrl = "https://auth.robokassa.kz/Merchant/bundle/robokassa_iframe.js";
-
-        if ($this->config->get('payment_robokassa_country') == 'RUB') {
-            $data['iframeUrl'] = $ruIframeUrl;
-        } else {
-            $data['iframeUrl'] = $kzIframeUrl;
-        }
-
-        if ($this->config->get('payment_robokassa_status_iframe')) {
-            $data['robokassa_status_iframe'] = 1;
-        } else {
-            $data['robokassa_status_iframe'] = 0;
-        }
-
-        // подели
-        if ($this->config->get('payment_robokassa_status_podeli')) {
-
-            // Проверка, находится ли сумма в диапазоне от 300 до 35000
-            $minAmount = 300;
-            $maxAmount = 35000;
-
-            if ($data['out_summ'] >= $minAmount && $data['out_summ'] <= $maxAmount) {
-                $data['robokassa_status_podeli'] = 1;
-                $data['IncCurrLabel'] = 'Podeli';
-            } else {
-                $data['robokassa_status_podeli'] = 0;
-            }
-
-        }
-
-        return $this->load->view('extension/payment/robokassa', $data);
+        return $this->load->view('extension/payment/robokassa_podeli', $data);
     }
 
-    public function success()
-    {
-
-
-        if ($this->config->get('payment_robokassa_test')) {
-            $password_1 = $this->config->get('payment_robokassa_test_password_1');
-        } else {
-            $password_1 = $this->config->get('payment_robokassa_password_1');
-        }
-
-
-        $out_summ = $this->request->post['OutSum'];
-        $order_id = $this->request->post["InvId"];
-        $crc = $this->request->post["SignatureValue"];
-
-        $crc = strtoupper($crc);
-
-        $my_crc = strtoupper(md5($out_summ . ":" . $order_id . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
-
-        if ($my_crc == $crc) {
-            $this->load->model('checkout/order');
-
-            $order_info = $this->model_checkout_order->getOrder($order_id);
-
-            if ($order_info['order_status_id'] == 0) {
-                $this->model_checkout_order->addOrderHistory($order_id, $this->config->get('config_order_status_id'));
-            }
-
-            $this->response->redirect($this->url->link('checkout/success', '', true));
-
-        } else {
-
-            $this->log->write('ROBOKASSA ошибка в заказе: ' . $order_id . 'Контрольные суммы не совпадают');
-
-            $this->response->addHeader($this->request->server['SERVER_PROTOCOL'] . ' 404 Not Found');
-
-            $this->response->redirect($this->url->link('error/error', '', true));
-
-        }
-
-        return true;
-    }
-
-    public function fail()
-    {
-
-        $this->response->redirect($this->url->link('checkout/checkout', '', true));
-
-        return true;
-    }
-
-    public function result()
-    {
-
-        if ($this->config->get('payment_robokassa_test')) {
-            $password_2 = $this->config->get('payment_robokassa_test_password_2');
-        } else {
-            $password_2 = $this->config->get('payment_robokassa_password_2');
-        }
-
-        $out_summ = $this->request->post['OutSum'];
-        $order_id = $this->request->post["InvId"];
-        $crc = $this->request->post["SignatureValue"];
-
-        $crc = strtoupper($crc);
-
-        $my_crc = strtoupper(md5($out_summ . ":" . $order_id . ":" . $password_2 . ":Shp_item=1" . ":Shp_label=official_opencart"));
-
-        if ($my_crc == $crc) {
-            $this->load->model('checkout/order');
-
-            $order_info = $this->model_checkout_order->getOrder($order_id);
-            $new_order_status_id = $this->config->get('payment_robokassa_order_status_id');
-
-            echo 'OK' . $this->request->post["InvId"];
-
-            if ($order_info['order_status_id'] == 0) {
-                $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id);
-            }
-
-            if ($order_info['order_status_id'] != $new_order_status_id) {
-                $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id);
-
-                if ($this->config->get('payment_robokassa_test')) {
-                    $this->log->write('ROBOKASSA в заказе: ' . $order_id . '. Статус заказа успешно изменен');
-                }
-
-            }
-
-
-            return true;
-        } else {
-
-            if ($this->config->get('payment_robokassa_test')) {
-                $this->log->write('ROBOKASSA ошибка в заказе: ' . $order_id . '. Контрольные суммы не совпадают');
-            }
-
-        }
-
-    }
-
-    public function test()
-    {
-        $this->load->model('extension/payment/robokassa');
-
-        $this->model_extension_payment_robokassa->sendSecondCheck(82);
-    }
 }

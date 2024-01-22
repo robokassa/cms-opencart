@@ -1,0 +1,7 @@
+<script type="text/javascript" src="https://auth.robokassa.ru/Merchant/PaymentForm/DirectPayment.js"></script>
+<div class="buttons">
+    <div class="pull-right">
+        <input type="submit" value="{{ button_confirm }}" class="btn btn-primary"
+               onclick="Robo.directPayment.startOp({MerchantLogin: '{{ robokassa_login }}',    OutSum: '{{ out_summ }}', InvId: '{{ inv_id }}', Description: '{{ order_desc }}', Email: '{{ email }}', {% if out_summ_currency %} OutSumCurrency: '{{ out_summ_currency }}', {% endif %} {% if robokassa_fiscal %} Receipt: '{{ receipt }}', {% endif %} IncCurrLabel: 'Podeli', SignatureValue: '{{ crc }}', Shp_item: '1', Shp_label: 'official_opencart', Culture: '{{ culture }}'})">
+    </div>
+</div>
