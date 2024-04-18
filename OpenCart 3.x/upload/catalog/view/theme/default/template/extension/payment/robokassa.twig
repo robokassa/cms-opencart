@@ -11,6 +11,10 @@
         <input type="hidden" name="MerchantLogin" value="{{ robokassa_login }}"/>
         <input type="hidden" name="OutSum" value="{{ out_summ }}"/>
         <input type="hidden" name="InvId" value="{{ inv_id }}"/>
+        {% if robokassa_status_hold %}
+            <input type="hidden" name="StepByStep" value="true"/>
+            <input type="hidden" name="ResultUrl2" value="{{ result2_url }}"/>
+        {% endif %}
         <input type="hidden" name="Description" value="{{ order_desc }}"/>
         <input type="hidden" name="Email" value="{{ email }}"/>
 

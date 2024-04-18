@@ -1,4 +1,4 @@
-<modification>  
+<modification>
   <code>Robokassa</code>
   <name>Robokassa opencart</name>
   <version>1.0.0</version>
@@ -6,17 +6,30 @@
   <link>https://robokassa.com</link>
   <file path="catalog/controller/api/order.php">
     <operation>
-        <search><![CDATA[$this->model_checkout_order->addOrderHistory($order_id, $this->request->post['order_status_id'], $this->request->post['comment'], $this->request->post['notify'], $this->request->post['override']);]]></search>
-		<!-- подключение виджета карты в страницу заказа -->
-        <add position="before"><![CDATA[
-			/* Робокасса */
-			if($order_info['order_status_id'] != $this->request->post['order_status_id'] && $order_info['payment_code'] == 'robokassa' && $this->request->post['order_status_id'] == $this->config->get('payment_robokassa_order_status_id_2check') && $this->config->get('payment_robokassa_fiscal') == 1){
-				$this->load->model('extension/payment/robokassa');
-					
-				$this->model_extension_payment_robokassa->sendSecondCheck($order_id);
-			}
-			/* Робокасса */
-        ]]></add>
+      <search><![CDATA[$this->model_checkout_order->addOrderHistory($order_id, $this->request->post['order_status_id'], $this->request->post['comment'], $this->request->post['notify'], $this->request->post['override']);]]></search>
+      <add position="before"><![CDATA[
+        // Итоговый чек
+        if($order_info['order_status_id'] != $this->request->post['order_status_id'] && $order_info['payment_code'] == 'robokassa' && $this->request->post['order_status_id'] == $this->config->get('payment_robokassa_order_status_id_2check') && $this->config->get('payment_robokassa_fiscal') == 1){
+		  $this->load->model('extension/payment/robokassa');
+
+		  $this->model_extension_payment_robokassa->sendSecondCheck($order_id);
+		}
+        // Итоговый чек
+
+        // Добавленное условие для вызова robokassa_hold_confirm
+        if ($order_info['order_status_id'] == 1 && $this->request->post['order_status_id'] == 2) {
+          $this->load->model('extension/payment/robokassa');
+          $this->model_extension_payment_robokassa->robokassa_hold_confirm($order_id);
+        }
+        // Добавленное условие для вызова robokassa_hold_confirm
+
+        // Добавленное условие для вызова robokassa_hold_cancel
+        if ($order_info['order_status_id'] == 1 && $this->request->post['order_status_id'] == 7) {
+          $this->load->model('extension/payment/robokassa');
+          $this->model_extension_payment_robokassa->robokassa_hold_cancel($order_id);
+        }
+        // Добавленное условие для вызова robokassa_hold_cancel
+      ]]></add>
     </operation>
   </file>
 </modification>

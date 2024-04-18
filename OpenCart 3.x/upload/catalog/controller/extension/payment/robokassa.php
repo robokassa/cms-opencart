@@ -44,10 +44,18 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         $data['order_desc'] = 'Покупка в ' . $this->config->get('config_name');
 
+        $data['result2_url'] = HTTP_SERVER . 'index.php?route=extension/payment/robokassa/result2';
+
         if (isset($this->session->data['guest']['email'])) {
             $data['email'] = $this->session->data['guest']['email'];
         } else {
             $data['email'] = '';
+        }
+
+        if ($this->config->get('payment_robokassa_status_hold')) {
+            $data['robokassa_status_hold'] = 1;
+        } else {
+            $data['robokassa_status_hold'] = 0;
         }
 
         if ($order_info['currency_code'] != $this->config->get('payment_robokassa_country') && $order_info['currency_code'] != 'RUB') {
@@ -143,15 +151,16 @@ class ControllerExtensionPaymentRobokassa extends Controller
             $data['receipt'] = urlencode($data['receipt']);
 
             if (isset($data['out_summ_currency'])) {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $data['receipt'] . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
+                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $data['receipt'] . ":" . ($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
             } else {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['receipt'] . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
+                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['receipt'] . ":" . ($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) . ":" : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
             }
         } else {
             if (isset($data['out_summ_currency'])) {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
+                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . (($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
+
             } else {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
+                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . (($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) . ":" : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
             }
         }
 
@@ -299,10 +308,74 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
     }
 
+    public function result2()
+    {
+        $this->load->model('checkout/order');
+        $input_data = file_get_contents('php://input');
+
+        // Проверяем тип контента на "application/json"
+        if (strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false) {
+            // Разбиваем JWT на три части
+            $token_parts = explode('.', $input_data);
+
+            // Проверяем, что есть три части
+            if (count($token_parts) === 3) {
+                // Декодируем вторую часть (полезные данные)
+                $json_data = json_decode(base64_decode($token_parts[1]), true);
+
+                // Проверяем наличие ключевого поля "state" со значением "HOLD"
+                if (isset($json_data['data']['state']) && $json_data['data']['state'] === 'HOLD') {
+                    // Изменяем статус заказа
+                    /*$order = new WC_Order($json_data['data']['invId']);
+                    $date_in_five_days = date('Y-m-d H:i:s', strtotime('+5 days'));
+                    $order->add_order_note("Robokassa: Платеж успешно подтвержден. Он ожидает подтверждения до {$date_in_five_days}, после чего автоматически отменится");
+                    $order->update_status('on-hold');*/
+                    $order_id = $json_data['data']['invId'];
+                    $order_info = $this->model_checkout_order->getOrder($order_id);
+                    $new_order_status_id = 1; // Идентификатор статуса "Pending"
+                    $message = "Robokassa: Платеж захолдирован.";
+
+                    if ($order_info['order_status_id'] == 0) {
+                        $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id);
+                    }
+
+                    if ($order_info['order_status_id'] != $new_order_status_id) {
+                        $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id, $message);
+                    }
+
+                    // Добавляем событие, которое делает unhold через 5 дней
+                    //wp_schedule_single_event(strtotime('+5 days'), 'robokassa_cancel_payment_event', array($order->get_id()));
+                }
+                if (isset($json_data['data']['state']) && $json_data['data']['state'] === 'OK') {
+                    // Изменяем статус заказа
+                    $order_id = $json_data['data']['invId'];
+                    $order_info = $this->model_checkout_order->getOrder($order_id);
+                    $new_order_status_id = 2; // Идентификатор статуса "Processing"
+                    $message = "Robokassa: Платеж успешно подтвержден.";
+
+                    if ($order_info['order_status_id'] == 0) {
+                        $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id);
+                    }
+
+                    if ($order_info['order_status_id'] != $new_order_status_id) {
+                        $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id, $message);
+                    }
+
+                }
+                http_response_code(200);
+            } else {
+                http_response_code(400);
+            }
+        } else {
+            http_response_code(415); // Unsupported Media Type
+        }
+    }
+
     public function test()
     {
         $this->load->model('extension/payment/robokassa');
 
-        $this->model_extension_payment_robokassa->sendSecondCheck(82);
+        $this->model_extension_payment_robokassa->robokassa_hold_cancel(584);
     }
+
 }

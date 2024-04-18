@@ -284,6 +284,13 @@ class ControllerExtensionPaymentRobokassa extends Controller
         } else {
             $data['payment_robokassa_status_iframe'] = $this->config->get('payment_robokassa_status_iframe');
         }
+
+        if (isset($this->request->post['payment_robokassa_status_hold'])) {
+            $data['payment_robokassa_status_hold'] = $this->request->post['payment_robokassa_status_hold'];
+        } else {
+            $data['payment_robokassa_status_hold'] = $this->config->get('payment_robokassa_status_hold');
+        }
+
         //подели
         if (isset($this->request->post['payment_robokassa_status_podeli'])) {
             $data['payment_robokassa_status_podeli'] = $this->request->post['payment_robokassa_status_podeli'];
