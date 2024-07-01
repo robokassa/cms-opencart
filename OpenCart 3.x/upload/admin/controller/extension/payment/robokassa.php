@@ -86,6 +86,9 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $data['entry_fail_url'] = $this->language->get('entry_fail_url');
         $data['entry_test'] = $this->language->get('entry_test');
         $data['entry_order_status'] = $this->language->get('entry_order_status');
+		$data['entry_order_pending'] = $this->language->get('entry_order_pending');
+		$data['entry_order_processing'] = $this->language->get('entry_order_processing');
+		$data['entry_order_canceled'] = $this->language->get('entry_order_canceled');
         $data['entry_geo_zone'] = $this->language->get('entry_geo_zone');
         $data['entry_status'] = $this->language->get('entry_status');
         $data['entry_sort_order'] = $this->language->get('entry_sort_order');
@@ -251,6 +254,25 @@ class ControllerExtensionPaymentRobokassa extends Controller
         } else {
             $data['payment_robokassa_order_status_id'] = $this->config->get('payment_robokassa_order_status_id');
         }
+		
+        if (isset($this->request->post['payment_robokassa_order_status_id_pending'])) {
+            $data['payment_robokassa_order_status_id_pending'] = $this->request->post['payment_robokassa_order_status_id_pending'];
+        } else {
+            $data['payment_robokassa_order_status_id_pending'] = $this->config->get('payment_robokassa_order_status_id_pending');
+        }
+
+        if (isset($this->request->post['payment_robokassa_order_status_id_processing'])) {
+            $data['payment_robokassa_order_status_id_processing'] = $this->request->post['payment_robokassa_order_status_id_processing'];
+        } else {
+            $data['payment_robokassa_order_status_id_processing'] = $this->config->get('payment_robokassa_order_status_id_processing');
+        }
+
+        if (isset($this->request->post['payment_robokassa_order_status_id_canceled'])) {
+            $data['payment_robokassa_order_status_id_canceled'] = $this->request->post['payment_robokassa_order_status_id_canceled'];
+        } else {
+            $data['payment_robokassa_order_status_id_canceled'] = $this->config->get('payment_robokassa_order_status_id_canceled');
+        }			
+		
 
         if (isset($this->request->post['payment_robokassa_order_status_id_2check'])) {
             $data['payment_robokassa_order_status_id_2check'] = $this->request->post['payment_robokassa_order_status_id_2check'];
