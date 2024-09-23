@@ -34,9 +34,9 @@ class ModelExtensionPaymentRobokassaCredit extends Model {
         if ($this->config->get('payment_robokassa_status')) {
             $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "zone_to_geo_zone WHERE geo_zone_id = '" . (int)$this->config->get('payment_robokassa_geo_zone_id') . "' AND country_id = '" . (int)$address['country_id'] . "' AND (zone_id = '" . (int)$address['zone_id'] . "' OR zone_id = '0')");
 
-            if (!$this->config->get('payment_robokassa_geo_zone_id') && $total >= 1500 && $total <= 200000 && $this->checkCurrency('AlwaysYes')) {
+            if (!$this->config->get('payment_robokassa_geo_zone_id') && $total >= 2000 && $total <= 300000 && $this->checkCurrency('OTP')) {
                 $status = TRUE;
-            } elseif ($query->num_rows && $total >= 1500 && $total <= 200000 && $this->checkCurrency('AlwaysYes')) {
+            } elseif ($query->num_rows && $total >= 2000 && $total <= 300000 && $this->checkCurrency('OTP')) {
                 $status = TRUE;
             } else {
                 $status = FALSE;
