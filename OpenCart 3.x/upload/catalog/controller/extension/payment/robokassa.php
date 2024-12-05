@@ -209,7 +209,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
     public function success()
     {
-
+        $session = $this->session;
 
         if ($this->config->get('payment_robokassa_test')) {
             $password_1 = $this->config->get('payment_robokassa_test_password_1');
@@ -234,6 +234,8 @@ class ControllerExtensionPaymentRobokassa extends Controller
             if ($order_info['order_status_id'] == 0) {
                 $this->model_checkout_order->addOrderHistory($order_id, $this->config->get('config_order_status_id'));
             }
+
+            $session->data['user_id'] = $this->customer->getId();
 
             $this->response->redirect($this->url->link('checkout/success', '', true));
 
