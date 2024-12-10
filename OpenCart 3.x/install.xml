@@ -17,14 +17,14 @@
         // Итоговый чек
 
         // Добавленное условие для вызова robokassa_hold_confirm
-        if ($order_info['order_status_id'] == 1 && $this->request->post['order_status_id'] == 2) {
+        if ($order_info['order_status_id'] == $this->config->get('payment_robokassa_order_status_id_pending') && $this->request->post['order_status_id'] == $this->config->get('payment_robokassa_order_status_id_processing')) {
           $this->load->model('extension/payment/robokassa');
           $this->model_extension_payment_robokassa->robokassa_hold_confirm($order_id);
         }
         // Добавленное условие для вызова robokassa_hold_confirm
 
         // Добавленное условие для вызова robokassa_hold_cancel
-        if ($order_info['order_status_id'] == 1 && $this->request->post['order_status_id'] == 7) {
+        if ($order_info['order_status_id'] == $this->config->get('payment_robokassa_order_status_id_pending') && $this->request->post['order_status_id'] == $this->config->get('payment_robokassa_order_status_id_canceled')) {
           $this->load->model('extension/payment/robokassa');
           $this->model_extension_payment_robokassa->robokassa_hold_cancel($order_id);
         }
