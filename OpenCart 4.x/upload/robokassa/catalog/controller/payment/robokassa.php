@@ -99,7 +99,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
                 $item_price -= $item_discount;
 
                 $items[] = [
-                    'name' => trim(htmlspecialchars($order_product['name'])), 0, 63,
+                    'name' => mb_substr(trim(htmlspecialchars($order_product['name'])), 0, 128, 'UTF-8'),
                     //'name'     => htmlspecialchars($product['name']),
                     'cost' => round($item_price, 2)   ,
                     'quantity' => $order_product['quantity'],
@@ -110,26 +110,31 @@ class Robokassa extends \Opencart\System\Engine\Controller
             }
 
 
-            if (isset($this->session->data['shipping_method'])) {
-                $shipping = explode('.', $this->session->data['shipping_method']);
-                $shipping_method_info = $this->session->data['shipping_methods'][$shipping[0]]['quote'][$shipping[1]];
+            if (isset($this->session->data['shipping_method']) && is_array($this->session->data['shipping_method'])) {
+                $shipping = $this->session->data['shipping_method'];
 
-                $shipping_name = $shipping_method_info['title'];
-                $shipping_price = $shipping_method_info['cost'];
+                if (isset($shipping['name'], $shipping['cost'])) {
+                    $shipping_name = $shipping['name'];
+                    $shipping_price = $shipping['cost'];
+                    $shipping_tax = $this->config->get('payment_robokassa_tax');
+                    $payment_object = $this->config->get('payment_robokassa_payment_object');
+                    $payment_method = 'full_prepayment';
 
-
-                if ($shipping_price > 0)  {
-
-                    $items[] = [
-                        'name' => trim(htmlspecialchars($shipping_name)), 0, 63,
-                        'cost' => $this->currency->format($shipping_price, 'RUB', false, false),
-                        'quantity' => 1,
-                        'tax' => $tax,
-                        'payment_method' => $payment_method,
-                        'payment_object' => $payment_object,
-                    ];
-
+                    if ($shipping_price > 0) {
+                        $items[] = [
+                            'name' => mb_substr(trim(htmlspecialchars($shipping_name)), 0, 128, 'UTF-8'),
+                            'cost' => $this->currency->format($shipping_price, 'RUB', false, false),
+                            'quantity' => 1,
+                            'tax' => $tax,
+                            'payment_method' => $payment_method,
+                            'payment_object' => $payment_object,
+                        ];
+                    }
+                } else {
+                    $this->log->write('Ошибка: Отсутствуют необходимые данные о доставке (name, cost).');
                 }
+            } else {
+                $this->log->write('Ошибка: shipping_method не является массивом или отсутствует.');
             }
 
             $data['receipt'] = $receipt[] = json_encode(array(
