@@ -3,7 +3,7 @@ name: Build OCMOD ZIP and Create Release
 on:
   push:
     branches:
-      - main  # Этот процесс будет запускаться при пуше в ветку main
+      - master  # Этот процесс будет запускаться при пуше в ветку main
 
 jobs:
   build-and-release:
