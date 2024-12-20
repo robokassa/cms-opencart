@@ -69,7 +69,7 @@ jobs:
       id: release-oc4
       uses: softprops/action-gh-release@v1
       with:
-        files: release/opencart-4/robokassa4.ocmod.zip  # Указываем путь к архиву OpenCart 4.x
+        files: release/opencart-4/robokassa.ocmod.zip  # Указываем путь к архиву OpenCart 4.x
         tag_name: ${{ env.TAG_OC4 }}  # Используем сгенерированный тег для OpenCart 4.x
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Токен для аутентификации на GitHub
