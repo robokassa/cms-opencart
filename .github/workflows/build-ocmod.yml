@@ -54,7 +54,7 @@ jobs:
        mkdir -p release/opencart-4/temp  # Создаем временную папку
        cp -r OpenCart\ 4.x/upload/robokassa/* release/opencart-4/temp/  # Копируем содержимое robokassa во временную папку
        cd release/opencart-4/temp  # Переходим в временную папку
-       zip -r ../robokassa4.ocmod.zip .  # Архивируем содержимое временной папки
+       zip -r ../robokassa.ocmod.zip .  # Архивируем содержимое временной папки
        cd ../..  # Возвращаемся в корневую директорию
        rm -rf release/opencart-4/temp  # Удаляем временную папку
 
