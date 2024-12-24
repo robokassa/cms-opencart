@@ -5,7 +5,7 @@ $_['heading_title']   	 	= 'Робокасса';
 // Text 
 $_['text_payment']      	= 'Оплата';
 $_['text_success']       	= 'Настройки модуля оплаты Робокасса обновлены!';
-$_['text_robokassa'] 		= '<a target="_blank" href="https://robokassa.ru/"><img src="/admin/view/image/payment/robokassa.png" alt="robokassa" style="max-width:140px" /></a>';
+$_['text_robokassa'] 		= '<a target="_blank" href="https://robokassa.ru/"><img src="/extension/robokassa/admin/view/image/payment/robokassa.png" alt="robokassa" style="max-width:140px" /></a>';
 $_['text_edit']      	    = 'Редактирование модуля "Робокасса"';
 $_['text_enabled']          = 'Включено';
 $_['text_disabled']         = 'Отключено';

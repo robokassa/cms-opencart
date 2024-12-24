@@ -3,34 +3,25 @@ namespace Opencart\Catalog\Model\Extension\Robokassa\Payment;
 
 class Robokassa extends \Opencart\System\Engine\Model {
 
-	public function getMethods($address) {
-		$this->load->language('extension/robokassa/payment/robokassa');
-		
-		if ($this->config->get('payment_robokassa_status')) {
+    public function getMethods($address)
+    {
+        $this->load->language('extension/robokassa/payment/robokassa');
 
-			if (!$this->config->get('payment_robokassa_geo_zone_id')) {
-				$status = TRUE;
-			} else {
-				$status = FALSE;
-			}
-		} else {
-			$status = FALSE;
-		}
-		
-		$method_data = array();
-		
-		if ($status) {
-			$method_data = array(
-				'code'       => 'robokassa',
-				'title'      => $this->language->get('text_title'),
-				'terms'      => '',
-				'sort_order' => $this->config->get('payment_robokassa_sort_order')
-			);
-		}
-		return $method_data;
-	}
+        $option_data['robokassa'] = [
+            'code' => 'robokassa.robokassa',
+            'name' => $this->language->get('text_title')
+        ];
+
+        $method_data = array(
+            'code'          => 'robokassa',
+            'option'        => $option_data,
+            'name'          => $this->language->get('text_title'),
+            'sort_order'    => $this->config->get('payment_robokassa_sort_order'),
+        );
+
+        return $method_data;
+    }
 	
-
     protected static function formatSignReplace($string)
     {
     	return \strtr(
