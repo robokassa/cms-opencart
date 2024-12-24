@@ -1,7 +1,7 @@
 <modification>
   <code>Robokassa</code>
   <name>Robokassa opencart</name>
-  <version>1.0.0</version>
+  <version>1.0.2</version>
   <author>Robokassa</author>
   <link>https://robokassa.com</link>
   <file path="catalog/controller/api/order.php">

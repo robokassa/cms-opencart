@@ -239,18 +239,26 @@ class ModelExtensionPaymentRobokassa extends Model {
         }
 
         $shipping = $this->getTotalShipping($order_id);
-        $shipping_name = $shipping['title'];
-        $shipping_price = $shipping['value'];
+        // Проверяем, есть ли доставка
+        if (is_array($shipping) && isset($shipping['title'], $shipping['value'])) {
+            $shipping_name = $shipping['title'];
+            $shipping_price = $shipping['value'];
 
-        if ($shipping_price > 0) {
-            $receipt_items[] = array(
-                'name' => utf8_substr(trim(htmlspecialchars($shipping_name)), 0, 63),
-                'quantity' => 1,
-                'sum' => $this->currency->format($shipping_price, 'RUB', false, false),
-                'tax' => $this->config->get('payment_robokassa_tax'),
-                'payment_method' => 'full_prepayment',
-                'payment_object' => $this->config->get('payment_robokassa_payment_object'),
-            );
+            // Добавляем данные о доставке в чек, если цена доставки больше 0
+            if ($shipping_price > 0) {
+                $receipt_items[] = array(
+                    'name' => utf8_substr(trim(htmlspecialchars($shipping_name)), 0, 63),
+                    'quantity' => 1,
+                    'sum' => $this->currency->format($shipping_price, 'RUB', false, false),
+                    'tax' => $this->config->get('payment_robokassa_tax'),
+                    'payment_method' => 'full_prepayment',
+                    'payment_object' => $this->config->get('payment_robokassa_payment_object'),
+                );
+            }
+        } else {
+            // Если доставка отсутствует, устанавливаем значения по умолчанию
+            $shipping_name = '';
+            $shipping_price = 0;
         }
 
         $request_data = array(
