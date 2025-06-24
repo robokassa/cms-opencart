@@ -106,7 +106,7 @@ class ControllerExtensionPaymentRobokassaCredit extends Controller
                 $item_price -= $item_discount;
 
                 $items[] = [
-                    'name' => utf8_substr(trim(htmlspecialchars($order_product['name'])), 0, 63),
+                    'name' => utf8_substr(trim(htmlspecialchars($order_product['name'])), 0, 128),
                     'cost' => round($item_price, 2),
                     'quantity' => $order_product['quantity'],
                     'payment_method' => $payment_method,
@@ -122,7 +122,7 @@ class ControllerExtensionPaymentRobokassaCredit extends Controller
                 if ($shipping_price > 0) {
 
                     $items[] = [
-                        'name' => utf8_substr(trim(htmlspecialchars($shipping_name)), 0, 63),
+                        'name' => utf8_substr(trim(htmlspecialchars($shipping_name)), 0, 128),
                         'cost' => $this->currency->format($shipping_price, 'RUB', false, false),
                         'quantity' => 1,
                         'tax' => $tax,
