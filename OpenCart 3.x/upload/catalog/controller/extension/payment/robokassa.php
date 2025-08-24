@@ -282,6 +282,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
             $order_info = $this->model_checkout_order->getOrder($order_id);
             $new_order_status_id = $this->config->get('payment_robokassa_order_status_id');
+			$message = 'Статус заказа успешно изменен';
 
             echo 'OK' . $this->request->post["InvId"];
 
@@ -290,10 +291,10 @@ class ControllerExtensionPaymentRobokassa extends Controller
             }
 
             if ($order_info['order_status_id'] != $new_order_status_id) {
-                $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id);
+                $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id, $message);
 
                 if ($this->config->get('payment_robokassa_test')) {
-                    $this->log->write('ROBOKASSA в заказе: ' . $order_id . '. Статус заказа успешно изменен');
+                    $this->log->write('ROBOKASSA в заказе: ' . $order_id . '. ' . $message);
                 }
 
             }
@@ -334,7 +335,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
                     $order->update_status('on-hold');*/
                     $order_id = $json_data['data']['invId'];
                     $order_info = $this->model_checkout_order->getOrder($order_id);
-                    $new_order_status_id = 1; // Идентификатор статуса "Pending"
+                    $new_order_status_id = $this->config->get('payment_robokassa_order_status_id_pending'); // Идентификатор статуса "Pending"
                     $message = "Robokassa: Платеж захолдирован.";
 
                     if ($order_info['order_status_id'] == 0) {
@@ -352,7 +353,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
                     // Изменяем статус заказа
                     $order_id = $json_data['data']['invId'];
                     $order_info = $this->model_checkout_order->getOrder($order_id);
-                    $new_order_status_id = 2; // Идентификатор статуса "Processing"
+                    $new_order_status_id = $this->config->get('payment_robokassa_order_status_id_processing'); // Идентификатор статуса "Processing"
                     $message = "Robokassa: Платеж успешно подтвержден.";
 
                     if ($order_info['order_status_id'] == 0) {
