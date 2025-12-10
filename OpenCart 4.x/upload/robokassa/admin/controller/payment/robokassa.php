@@ -331,4 +331,88 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         return !$this->error;
     }
+
+
+	private function getModuleVersion()
+	{
+		$version = 'unknown';
+
+		$file = DIR_EXTENSION . 'robokassa/install.json';
+
+		if (is_file($file)) {
+			$json = file_get_contents($file);
+
+			if ($json) {
+				$data = json_decode($json, true);
+
+				if (isset($data['version']) && $data['version']) {
+					$version = $data['version'];
+				}
+			}
+		}
+
+		return $version;
+	}
+
+
+	private function sendPulseStatusChange($status)
+	{
+		$apiUrl = 'https://pulse.robokassa.com/api/module-status';
+		$apiKey = 'robokassa-plugin-stat-key-3953';
+
+		$merchantId = $this->config->get('payment_robokassa_login');
+		if (!$merchantId) {
+			$merchantId = 'unknown';
+		}
+
+		if (defined('HTTPS_CATALOG')) {
+			$siteUrl = HTTPS_CATALOG;
+		} else {
+			$siteUrl = HTTP_CATALOG;
+		}
+
+		$moduleVersion = $this->getModuleVersion();
+		$reportedAt    = date('Y-m-d H:i:s');
+
+		$payload = array(
+			'cms'         => 'opencart4',
+			'merchant_id' => $merchantId,
+			'site_id'     => $siteUrl,
+			'status'      => $status,
+			'reported_at' => $reportedAt,
+			'version'     => $moduleVersion,
+		);
+
+		$ch = curl_init($apiUrl);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_POST, true);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+			'Content-Type: application/json',
+			'X-API-KEY: ' . $apiKey,
+		));
+		curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+		curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+
+		$response = curl_exec($ch);
+		$errno    = curl_errno($ch);
+		$error    = curl_error($ch);
+		$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
+
+		/*
+		$log = new \Opencart\System\Library\Log('robokassa_pulse.log');
+		$log->write('payload: ' . json_encode($payload));
+		$log->write("http=$httpCode errno=$errno error=$error resp=$response");
+		*/
+	}
+
+	public function install()
+	{
+		$this->sendPulseStatusChange('enabled');
+	}
+
+	public function uninstall()
+	{
+		$this->sendPulseStatusChange('disabled');
+	}
 }

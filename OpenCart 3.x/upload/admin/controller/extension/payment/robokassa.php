@@ -337,4 +337,74 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         return !$this->error;
     }
+
+	private function getModuleVersion()
+	{
+		$version = 'unknown';
+
+		$query = $this->db->query(
+			"SELECT `version` FROM `" . DB_PREFIX . "modification` WHERE `code` = 'Robokassa' LIMIT 1"
+		);
+
+		if ($query->num_rows && !empty($query->row['version'])) {
+			$version = $query->row['version'];
+		}
+
+		return $version;
+	}
+
+	private function sendPulseStatusChange($status)
+	{
+		$apiUrl = 'https://pulse.robokassa.com/api/module-status';
+		$apiKey = 'robokassa-plugin-stat-key-3953';
+
+		$merchantId = $this->config->get('payment_robokassa_login');
+		if (!$merchantId) {
+			$merchantId = 'unknown';
+		}
+
+		if (defined('HTTPS_CATALOG')) {
+			$siteUrl = HTTPS_CATALOG;
+		} else {
+			$siteUrl = HTTP_CATALOG;
+		}
+
+		$moduleVersion = $this->getModuleVersion();
+		$reportedAt    = date('Y-m-d H:i:s');
+
+		$payload = array(
+			'cms'         => 'opencart3',
+			'merchant_id' => $merchantId,
+			'site_id'     => $siteUrl,
+			'status'      => $status,
+			'reported_at' => $reportedAt,
+			'version'     => $moduleVersion,
+		);
+
+		$ch = curl_init($apiUrl);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_POST, true);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+			'Content-Type: application/json',
+			'X-API-KEY: ' . $apiKey,
+		));
+		curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+		curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+
+		$response = curl_exec($ch);
+		$errno    = curl_errno($ch);
+		$error    = curl_error($ch);
+		$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
+	}
+
+	public function install()
+	{
+		$this->sendPulseStatusChange('enabled');
+	}
+
+	public function uninstall()
+	{
+		$this->sendPulseStatusChange('disabled');
+	}
 }
