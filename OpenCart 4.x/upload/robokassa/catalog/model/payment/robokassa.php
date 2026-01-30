@@ -105,7 +105,7 @@ class Robokassa extends \Opencart\System\Engine\Model {
 					'quantity' => 1,
 					'sum' => $this->currency->format($shipping_price, 'RUB', false, false),
 					'tax' => $this->config->get('payment_robokassa_tax'),
-					'payment_method' => 'full_prepayment',
+					'payment_method' => 'full_payment',
 					'payment_object' => $this->config->get('payment_robokassa_payment_object'),
 				];
 				
@@ -144,7 +144,7 @@ class Robokassa extends \Opencart\System\Engine\Model {
 			    'quantity' => $product['quantity'],
 			    'sum' => $price,
 			    'tax' => $this->config->get('payment_robokassa_tax'),
-			    'payment_method' => 'full_prepayment',
+			    'payment_method' => 'full_payment',
 			    'payment_object' => $this->config->get('payment_robokassa_payment_object'),
 		    ];
 			
