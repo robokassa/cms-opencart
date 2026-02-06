@@ -45,6 +45,15 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $data['order_desc'] = 'Покупка в ' . $this->config->get('config_name');
 
+		$data['result2_url'] = HTTP_SERVER . 'index.php?route=extension/robokassa/payment/result_hold';
+
+		if ($this->config->get('payment_robokassa_status_hold')) {
+			$data['robokassa_status_hold'] = 1;
+		} else {
+			$data['robokassa_status_hold'] = 0;
+		}
+
+
         $data['email'] =  $this->session->data['customer']['email'];
 
         if ($order_info['currency_code'] != $this->config->get('payment_robokassa_country') && $order_info['currency_code'] != 'RUB') {
@@ -146,15 +155,16 @@ class Robokassa extends \Opencart\System\Engine\Controller
             $data['receipt'] = urlencode($data['receipt']);
 
             if (isset($data['out_summ_currency'])) {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $data['receipt'] . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
+                
+				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $data['receipt'] . ":" . ($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
             } else {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['receipt'] . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
+                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['receipt'] . ":" . ($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) . ":" : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
             }
         } else {
             if (isset($data['out_summ_currency'])) {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
+                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . (($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
             } else {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
+                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . (($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) . ":" : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
             }
         }
 
