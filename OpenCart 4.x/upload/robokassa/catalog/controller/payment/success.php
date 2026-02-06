@@ -2,45 +2,60 @@
 namespace Opencart\Catalog\Controller\Extension\Robokassa\Payment;
 
 class Success extends \Opencart\System\Engine\Controller {
-    public function index()
-    {
-        
 
-        if ($this->config->get('payment_robokassa_test')) {
-            $password_1 = $this->config->get('payment_robokassa_test_password_1');
-        } else {
-            $password_1 = $this->config->get('payment_robokassa_password_1');
-        }
-        
-        $out_summ = $this->request->post['OutSum'];
-        $order_id = $this->request->post["InvId"];
-        $crc = $this->request->post["SignatureValue"];
+	public function index(): void
+	{
+		$session = $this->session;
 
-        $crc = strtoupper($crc);
+		if ($this->config->get('payment_robokassa_test')) {
+			$password_1 = $this->config->get('payment_robokassa_test_password_1');
+		} else {
+			$password_1 = $this->config->get('payment_robokassa_password_1');
+		}
 
-        $my_crc = strtoupper(md5($out_summ . ":" . $order_id . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
+		$out_summ = $this->request->post['OutSum'] ?? null;
+		$order_id = isset($this->request->post['InvId']) ? (int)$this->request->post['InvId'] : null;
+		$crc      = $this->request->post['SignatureValue'] ?? null;
 
-        if ($my_crc == $crc) {
-            $this->load->model('checkout/order');
+		if (!$out_summ || $order_id === null || !$crc) {
+			$this->response->addHeader($this->request->server['SERVER_PROTOCOL'] . ' 404 Not Found');
+			$this->response->redirect($this->url->link('error/error', '', true));
+			return;
+		}
 
-            $order_info = $this->model_checkout_order->getOrder($order_id);
+		$crc = strtoupper($crc);
 
-            if ($order_info['order_status_id'] == 0) {
-                $this->model_checkout_order->addHistory($order_id, $this->config->get('config_order_status_id'));
-            }
+		$my_crc = strtoupper(md5(
+			$out_summ . ":" . $order_id . ":" . $password_1 . ":Shp_item=1:Shp_label=official_opencart"
+		));
 
-            $this->response->redirect($this->url->link('checkout/success', '', true));
+		if ($my_crc !== $crc) {
+			$this->log->write('ROBOKASSA success: signature mismatch. InvId=' . $order_id . ' OutSum=' . (string)$out_summ);
+			$this->response->addHeader($this->request->server['SERVER_PROTOCOL'] . ' 404 Not Found');
+			$this->response->redirect($this->url->link('error/error', '', true));
+			return;
+		}
 
-        } else {
+		// HOLD
+		if ($order_id === 0) {
+			$this->response->redirect($this->url->link('checkout/success', '', true));
+			return;
+		}
 
-            $this->log->write('ROBOKASSA ошибка в заказе: ' . $order_id . 'Контрольные суммы не совпадают');
+		$this->load->model('checkout/order');
+		$order_info = $this->model_checkout_order->getOrder($order_id);
 
-            $this->response->addHeader($this->request->server['SERVER_PROTOCOL'] . ' 404 Not Found');
+		if (!$order_info || !isset($order_info['order_status_id'])) {
+			$this->log->write('ROBOKASSA success: order not found. InvId=' . $order_id);
+			$this->response->addHeader($this->request->server['SERVER_PROTOCOL'] . ' 404 Not Found');
+			$this->response->redirect($this->url->link('error/error', '', true));
+			return;
+		}
 
-            $this->response->redirect($this->url->link('error/error', '', true));
+		if ((int)$order_info['order_status_id'] === 0) {
+			$this->model_checkout_order->addHistory($order_id, (int)$this->config->get('config_order_status_id'));
+		}
 
-        }
-
-        return true;
-    }
+		$this->response->redirect($this->url->link('checkout/success', '', true));
+	}
 }
