@@ -36,6 +36,7 @@ $_['entry_status']       	= 'Статус';
 $_['entry_sort_order']   	= 'Порядок сортировки';
 $_['entry_country']   		= 'Страна магазина';
 $_['entry_iframe']   		= 'Включить iframe';
+$_['entry_product_options'] = 'Передавать опции товара';
 $_['entry_languages_map']   = 'Язык интерфейса платёжной страницы';
 $_['entry_podeli']   		= 'Оплата через Podeli';
 $_['entry_hold']   	        = 'Отложенные платежи';

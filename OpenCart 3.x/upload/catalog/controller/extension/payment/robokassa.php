@@ -2,6 +2,57 @@
 
 class ControllerExtensionPaymentRobokassa extends Controller
 {
+	/**
+	 * Формирует название товара для отправки в чек Robokassa.
+	 *
+	 * @param int   $order_id
+	 * @param array $order_product
+	 * @param bool  $is_send_product_options
+	 *
+	 * @return string
+	 */
+	private function buildProductName($order_id, array $order_product, $is_send_product_options)
+	{
+		$product_name = trim(htmlspecialchars($order_product['name']));
+
+		if (!$is_send_product_options) {
+			return utf8_substr($product_name, 0, 128);
+		}
+
+		$options = $this->model_account_order->getOrderOptions($order_id, $order_product['order_product_id']);
+		$formatted_options = $this->formatProductOptions($options);
+
+		if ($formatted_options === '') {
+			return utf8_substr($product_name, 0, 128);
+		}
+
+		return utf8_substr($product_name . ' (' . $formatted_options . ')', 0, 128);
+	}
+
+	/**
+	 * Подготавливает опции товара в строку для чека.
+	 *
+	 * @param array $options
+	 *
+	 * @return string
+	 */
+	private function formatProductOptions(array $options)
+	{
+		$options_list = [];
+
+		foreach ($options as $option) {
+			if (empty($option['name']) || empty($option['value'])) {
+				continue;
+			}
+
+			$name = trim(htmlspecialchars($option['name']));
+			$value = trim(htmlspecialchars($option['value']));
+
+			$options_list[] = $name . ': ' . $value;
+		}
+
+		return implode(', ', $options_list);
+	}
     public function index()
     {
 
@@ -65,7 +116,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         // Расчет стоимости заказа с учетом бонусных баллов
         $total_order_cost = $order_info['total'] - $bonus_points;
-        $data['out_summ'] = (float) $this->currency->format($total_order_cost, $order_info['currency_code'], false, false);
+		$data['out_summ'] = (float)$this->currency->format($total_order_cost, $order_info['currency_code'], false, false);
 
 
 
@@ -86,6 +137,8 @@ class ControllerExtensionPaymentRobokassa extends Controller
             $payment_method = $this->config->get('payment_robokassa_payment_method');
             $payment_object = $this->config->get('payment_robokassa_payment_object');
 
+			$is_send_product_options = (bool)$this->config->get('payment_robokassa_send_product_options');
+
             $receipt = [];
 
             $items = [];
@@ -104,7 +157,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
                 $total_price += $order_product['price'] * $order_product['quantity'];
             }
 
-            $discount_percent = $discount / $total_price; // процент скидки на каждый товар
+			$discount_percent = ($total_price > 0) ? ($discount / $total_price) : 0;
 
             foreach ($order_products as $order_product) {
                 $item_price = $order_product['price'];
@@ -114,7 +167,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
                 $item_price -= $item_discount;
 
                 $items[] = [
-                    'name' => utf8_substr(trim(htmlspecialchars($order_product['name'])), 0, 128),
+					'name' => $this->buildProductName($order_info['order_id'], $order_product, $is_send_product_options),
                     'cost' => round($item_price, 2),
                     'quantity' => $order_product['quantity'],
                     'payment_method' => $payment_method,
