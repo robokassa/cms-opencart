@@ -91,6 +91,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $data['entry_sort_order'] = $this->language->get('entry_sort_order');
         $data['entry_country'] = $this->language->get('entry_country');
         $data['entry_iframe'] = $this->language->get('entry_iframe');
+		$data['entry_product_options'] = $this->language->get('entry_product_options');
 
         $data['help_fiscal'] = $this->language->get('help_fiscal');
         $data['help_iframe'] = $this->language->get('help_iframe');
@@ -239,8 +240,13 @@ class ControllerExtensionPaymentRobokassa extends Controller
         } else {
             $data['payment_robokassa_fiscal'] = $this->config->get('payment_robokassa_fiscal');
         }
+		if (isset($this->request->post['payment_robokassa_send_product_options'])) {
+			$data['payment_robokassa_send_product_options'] = $this->request->post['payment_robokassa_send_product_options'];
+		} else {
+			$data['payment_robokassa_send_product_options'] = $this->config->get('payment_robokassa_send_product_options');
+		}
 
-        if (isset($this->request->post['payment_robokassa_payment_method'])) {
+		if (isset($this->request->post['payment_robokassa_payment_method'])) {
             $data['payment_robokassa_payment_method'] = $this->request->post['payment_robokassa_payment_method'];
         } else {
             $data['payment_robokassa_payment_method'] = $this->config->get('payment_robokassa_payment_method');
