@@ -159,7 +159,7 @@ class ControllerExtensionPaymentRobokassaPodeli extends Controller
                 $item_price -= $item_discount;
 
                 $items[] = [
-					'name' => $this->buildProductName($order_info['order_id'], $order_product, $is_send_product_options),,
+					'name' => $this->buildProductName($order_info['order_id'], $order_product, $is_send_product_options),
                     'cost' => round($item_price, 2),
                     'quantity' => $order_product['quantity'],
                     'payment_method' => $payment_method,
