@@ -1,5 +1,5 @@
 <?php
-class ModelExtensionPaymentRobokassaCredit extends Model {
+class ModelExtensionPaymentRobokassaMokka extends Model {
 
     public function checkCurrency($alias) {
         $url = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/GetCurrencies?MerchantLogin=' . $this->config->get('payment_robokassa_login') . '&Language=ru';
@@ -29,32 +29,33 @@ class ModelExtensionPaymentRobokassaCredit extends Model {
     }
 
     public function getMethod($address, $total) {
-        $this->load->language('extension/payment/robokassa_credit');
+        $this->load->language('extension/payment/robokassa_mokka');
 
-        if ($this->config->get('payment_robokassa_status') && $this->config->get('payment_robokassa_credit_status')) {
+        if ($this->config->get('payment_robokassa_status') && $this->config->get('payment_robokassa_mokka_status')) {
             $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "zone_to_geo_zone WHERE geo_zone_id = '" . (int)$this->config->get('payment_robokassa_geo_zone_id') . "' AND country_id = '" . (int)$address['country_id'] . "' AND (zone_id = '" . (int)$address['zone_id'] . "' OR zone_id = '0')");
 
-            if (!$this->config->get('payment_robokassa_geo_zone_id') && $total >= 2000 && $total <= 300000 && $this->checkCurrency('OTP')) {
-                $status = TRUE;
-            } elseif ($query->num_rows && $total >= 2000 && $total <= 300000 && $this->checkCurrency('OTP')) {
-                $status = TRUE;
+            if (!$this->config->get('payment_robokassa_geo_zone_id') && $total >= 1000 && $total <= 250000 && $this->checkCurrency('Mokka')) {
+                $status = true;
+            } elseif ($query->num_rows && $total >= 1000 && $total <= 250000 && $this->checkCurrency('Mokka')) {
+                $status = true;
             } else {
-                $status = FALSE;
+                $status = false;
             }
         } else {
-            $status = FALSE;
+            $status = false;
         }
 
         $method_data = array();
 
         if ($status) {
             $method_data = array(
-                'code'       => 'robokassa_credit',
+                'code'       => 'robokassa_mokka',
                 'title'      => $this->language->get('text_title'),
                 'terms'      => '',
-                'sort_order' => $this->config->get('payment_robokassa_credit_sort_order')
+                'sort_order' => $this->config->get('payment_robokassa_mokka_sort_order')
             );
         }
+
         return $method_data;
     }
 }
