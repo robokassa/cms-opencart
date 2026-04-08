@@ -1,0 +1,146 @@
+<div class="robokassa-product-widget" id="robokassa-product-widget" data-product-id="{{ product_id }}" data-widget-url="{{ widget_data_url }}">
+    {% if show_bnpl %}
+        <div class="robokassa-product-widget__item robokassa-product-widget__item--bnpl">
+            <robokassa-widget
+                    outSum="{{ out_sum }}"
+                    merchantLogin="{{ merchant_login }}"
+                    receipt="{{ receipt }}"
+                    signature="{{ signature }}"
+                    theme="light"
+                    size="m"
+                    borderRadius="50"
+                    descriptionPosition="right"
+                    type="bnpl"
+                    email="{{ email }}"
+                    hasSecondLine="true"
+                    mode="payment">
+            </robokassa-widget>
+        </div>
+    {% endif %}
+    {% if show_credit %}
+        <div class="robokassa-product-widget__item robokassa-product-widget__item--credit">
+            <robokassa-widget
+                    outSum="{{ out_sum }}"
+                    merchantLogin="{{ merchant_login }}"
+                    receipt="{{ receipt }}"
+                    signature="{{ signature }}"
+                    theme="dark"
+                    size="m"
+                    borderRadius="12"
+                    descriptionPosition="right"
+                    type="credit"
+                    email="{{ email }}"
+                    hasSecondLine="false"
+                    mode="payment">
+            </robokassa-widget>
+        </div>
+    {% endif %}
+</div>
+
+<script src="https://auth.robokassa.ru/merchant/bundle/robokassa-iframe-badge.js"></script>
+<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		var container = document.getElementById('robokassa-product-widget');
+		if (!container) {
+			return;
+		}
+
+		if (typeof window.initRobokassaBadges === 'function') {
+			window.initRobokassaBadges();
+		}
+
+		var quantityInput = document.getElementById('input-quantity') || document.querySelector('input[name="quantity"]');
+		var productId = container.getAttribute('data-product-id');
+		var widgetDataUrl = container.getAttribute('data-widget-url');
+
+		if (!quantityInput || !productId || !widgetDataUrl) {
+			return;
+		}
+
+		var updateTimer = null;
+
+		function applyWidgetData(payload) {
+			var widgets = container.querySelectorAll('robokassa-widget');
+			for (var i = 0; i < widgets.length; i++) {
+				widgets[i].setAttribute('outSum', payload.out_sum);
+				widgets[i].setAttribute('merchantLogin', payload.merchant_login);
+				widgets[i].setAttribute('receipt', payload.receipt);
+				widgets[i].setAttribute('signature', payload.signature);
+				widgets[i].setAttribute('email', payload.email);
+			}
+
+			var bnpl = container.querySelector('.robokassa-product-widget__item--bnpl');
+			var credit = container.querySelector('.robokassa-product-widget__item--credit');
+
+			if (bnpl) {
+				bnpl.style.display = payload.show_bnpl ? '' : 'none';
+			}
+
+			if (credit) {
+				credit.style.display = payload.show_credit ? '' : 'none';
+			}
+
+			container.style.display = (payload.show_bnpl || payload.show_credit) ? '' : 'none';
+		}
+
+		function requestWidgetData() {
+			var quantity = parseInt(quantityInput.value, 10);
+			if (!quantity || quantity < 1) {
+				quantity = 1;
+			}
+
+			var separator = widgetDataUrl.indexOf('?') === -1 ? '?' : '&';
+			var xhr = new XMLHttpRequest();
+			xhr.open('GET', widgetDataUrl + separator + 'product_id=' + encodeURIComponent(productId) + '&quantity=' + encodeURIComponent(quantity), true);
+			xhr.onreadystatechange = function () {
+				if (xhr.readyState !== 4 || xhr.status < 200 || xhr.status >= 300) {
+					return;
+				}
+
+				var payload = null;
+
+				try {
+					payload = JSON.parse(xhr.responseText);
+				} catch (e) {
+					return;
+				}
+
+				if (!payload || !payload.success) {
+					container.style.display = 'none';
+					return;
+				}
+
+				applyWidgetData(payload);
+			};
+			xhr.send();
+		}
+
+		function scheduleUpdate() {
+			if (updateTimer) {
+				clearTimeout(updateTimer);
+			}
+
+			updateTimer = setTimeout(function () {
+				requestWidgetData();
+			}, 200);
+		}
+
+		quantityInput.addEventListener('input', scheduleUpdate);
+		quantityInput.addEventListener('change', scheduleUpdate);
+	});
+</script>
+
+<style>
+	.robokassa-product-widget {
+		margin: 15px 0;
+	}
+
+	.robokassa-product-widget__item + .robokassa-product-widget__item {
+		margin-top: 12px;
+	}
+
+	.robokassa-product-widget robokassa-widget {
+		display: block;
+		max-width: 420px;
+	}
+</style>

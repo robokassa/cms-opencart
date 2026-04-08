@@ -11,7 +11,6 @@ class ControllerExtensionPaymentRobokassaPodeli extends Controller
         $this->document->setTitle($this->language->get('heading_title'));
 
         $this->load->model('setting/setting');
-        $this->load->model('localisation/language');
 
         if (($this->request->server['REQUEST_METHOD'] == 'POST') && $this->validate()) {
 
@@ -46,32 +45,19 @@ class ControllerExtensionPaymentRobokassaPodeli extends Controller
 
 
 
+        $data['text_edit'] = $this->language->get('text_edit');
+        $data['text_enabled'] = $this->language->get('text_enabled');
+        $data['text_disabled'] = $this->language->get('text_disabled');
         $data['entry_status_podeli'] = $this->language->get('entry_status_podeli');
 
         $data['action'] = $this->url->link('extension/payment/robokassa_podeli', 'user_token=' . $this->session->data['user_token'], true);
 
         $data['cancel'] = $this->url->link('marketplace/extension', 'user_token=' . $this->session->data['user_token'] . '&type=payment', true);
 
-        $data['opencart_languages'] = $this->model_localisation_language->getLanguages();
-
-
-
         if (isset($this->request->post['payment_robokassa_podeli_status'])) {
             $data['payment_robokassa_podeli_status'] = $this->request->post['payment_robokassa_podeli_status'];
         } else {
             $data['payment_robokassa_podeli_status'] = $this->config->get('payment_robokassa_podeli_status');
-        }
-
-        if (isset($this->request->post['payment_robokassa_podeli_widget'])) {
-            $data['payment_robokassa_podeli_widget'] = $this->request->post['payment_robokassa_podeli_widget'];
-        } else {
-            $data['payment_robokassa_podeli_widget'] = $this->config->get('payment_robokassa_podeli_widget');
-        }
-
-        if (isset($this->request->post['payment_robokassa_podeli_widget_style'])) {
-            $data['payment_robokassa_podeli_widget_style'] = $this->request->post['payment_robokassa_podeli_widget_style'];
-        } else {
-            $data['payment_robokassa_podeli_widget_style'] = $this->config->get('payment_robokassa_podeli_widget_style');
         }
 
 

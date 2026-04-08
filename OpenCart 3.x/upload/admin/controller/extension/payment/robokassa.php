@@ -92,9 +92,17 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $data['entry_country'] = $this->language->get('entry_country');
         $data['entry_iframe'] = $this->language->get('entry_iframe');
 		$data['entry_product_options'] = $this->language->get('entry_product_options');
+        $entry_widget_status = $this->language->get('entry_widget_status');
+        $data['entry_widget_status'] = ($entry_widget_status && $entry_widget_status !== 'entry_widget_status')
+            ? $entry_widget_status
+            : 'Показывать виджет BNPL в карточке товара';
 
         $data['help_fiscal'] = $this->language->get('help_fiscal');
         $data['help_iframe'] = $this->language->get('help_iframe');
+        $help_widget_status = $this->language->get('help_widget_status');
+        $data['help_widget_status'] = ($help_widget_status && $help_widget_status !== 'help_widget_status')
+            ? $help_widget_status
+            : 'Единая настройка для отображения robokassa-widget в карточке товара.';
 
         $data['action'] = $this->url->link('extension/payment/robokassa', 'user_token=' . $this->session->data['user_token'], true);
 
@@ -289,6 +297,12 @@ class ControllerExtensionPaymentRobokassa extends Controller
             $data['payment_robokassa_status'] = $this->request->post['payment_robokassa_status'];
         } else {
             $data['payment_robokassa_status'] = $this->config->get('payment_robokassa_status');
+        }
+
+        if (isset($this->request->post['payment_robokassa_widget_status'])) {
+            $data['payment_robokassa_widget_status'] = $this->request->post['payment_robokassa_widget_status'];
+        } else {
+            $data['payment_robokassa_widget_status'] = $this->config->get('payment_robokassa_widget_status');
         }
 
         if (isset($this->request->post['payment_robokassa_status_iframe'])) {

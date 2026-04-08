@@ -32,4 +32,39 @@
       ]]></add>
     </operation>
   </file>
+  <file path="catalog/controller/product/product.php">
+    <operation>
+      <search regex="true"><![CDATA[~\$data\['review_status'\]\s*=\s*\$this->config->get\('config_review_status'\);~]]></search>
+      <add position="before"><![CDATA[
+        $data['robokassa_widget'] = '';
+
+        if ($this->config->get('payment_robokassa_status')
+          && $this->config->get('payment_robokassa_widget_status')
+          && $this->config->get('payment_robokassa_country') == 'RUB') {
+          if ($this->customer->isLogged() || !$this->config->get('config_customer_price')) {
+            if ((float)$product_info['special']) {
+              $robokassa_widget_amount = $this->tax->calculate($product_info['special'], $product_info['tax_class_id'], $this->config->get('config_tax'));
+            } else {
+              $robokassa_widget_amount = $this->tax->calculate($product_info['price'], $product_info['tax_class_id'], $this->config->get('config_tax'));
+            }
+
+            if ($robokassa_widget_amount > 0) {
+              $data['robokassa_widget'] = $this->load->controller('extension/payment/robokassa_widget', array(
+                'product_id' => $product_id,
+                'quantity' => isset($this->request->get['quantity']) ? (int)$this->request->get['quantity'] : $data['minimum']
+              ));
+            }
+          }
+        }
+      ]]></add>
+    </operation>
+  </file>
+  <file path="catalog/view/theme/*/template/product/product.twig">
+    <operation>
+      <search><![CDATA[<div id="product">]]></search>
+      <add position="before"><![CDATA[
+        {{ robokassa_widget }}
+      ]]></add>
+    </operation>
+  </file>
 </modification>

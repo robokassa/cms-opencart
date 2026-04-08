@@ -42,6 +42,9 @@ class ControllerExtensionPaymentRobokassaYandexSplit extends Controller
             'href' => $this->url->link('extension/payment/robokassa_yandex_split', 'user_token=' . $this->session->data['user_token'], true)
         );
 
+        $data['text_edit'] = $this->language->get('text_edit');
+        $data['text_enabled'] = $this->language->get('text_enabled');
+        $data['text_disabled'] = $this->language->get('text_disabled');
         $data['entry_status_yandex_split'] = $this->language->get('entry_status_yandex_split');
 
         $data['action'] = $this->url->link('extension/payment/robokassa_yandex_split', 'user_token=' . $this->session->data['user_token'], true);
