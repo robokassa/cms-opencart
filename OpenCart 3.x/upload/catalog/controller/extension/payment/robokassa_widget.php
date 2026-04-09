@@ -2,6 +2,24 @@
 
 class ControllerExtensionPaymentRobokassaWidget extends Controller
 {
+    private function isWidgetEnabled()
+    {
+        $store_id = (int)$this->config->get('config_store_id');
+        $query = $this->db->query(
+            "SELECT `value` FROM `" . DB_PREFIX . "setting`
+             WHERE `store_id` = '" . $store_id . "'
+               AND `code` = 'payment_robokassa_widget'
+               AND `key` = 'payment_robokassa_widget_status'
+             LIMIT 1"
+        );
+
+        if ($query->num_rows) {
+            return (bool)$query->row['value'];
+        }
+
+        return (bool)$this->config->get('payment_robokassa_widget_status');
+    }
+
     private function isSecureRequest()
     {
         return !empty($this->request->server['HTTPS']) && $this->request->server['HTTPS'] !== 'off';
@@ -46,24 +64,12 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
 
     private function isCreditEnabledForAmount($amount)
     {
-        return $this->config->get('payment_robokassa_credit_status')
-            && $amount >= 2000
-            && $amount <= 300000;
+        return $amount > 0;
     }
 
     private function isBnplEnabledForAmount($amount)
     {
-        $is_podeli = $this->config->get('payment_robokassa_podeli_status')
-            && $amount >= 300
-            && $amount <= 30000;
-        $is_mokka = $this->config->get('payment_robokassa_mokka_status')
-            && $amount >= 1000
-            && $amount <= 250000;
-        $is_yandex_split = $this->config->get('payment_robokassa_yandex_split_status')
-            && $amount >= 10
-            && $amount <= 200000;
-
-        return $is_podeli || $is_mokka || $is_yandex_split;
+        return $amount > 0;
     }
 
     private function buildReceipt($product_info, $quantity, $unit_amount)
@@ -167,8 +173,7 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
         $quantity = !empty($setting['quantity']) ? (int)$setting['quantity'] : 1;
 
         if (!$product_id
-            || !$this->config->get('payment_robokassa_status')
-            || !$this->config->get('payment_robokassa_widget_status')
+            || !$this->isWidgetEnabled()
             || $this->config->get('payment_robokassa_country') != 'RUB') {
             return '';
         }

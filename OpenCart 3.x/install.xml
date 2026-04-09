@@ -38,9 +38,7 @@
       <add position="before"><![CDATA[
         $data['robokassa_widget'] = '';
 
-        if ($this->config->get('payment_robokassa_status')
-          && $this->config->get('payment_robokassa_widget_status')
-          && $this->config->get('payment_robokassa_country') == 'RUB') {
+        if ($this->config->get('payment_robokassa_country') == 'RUB') {
           if ($this->customer->isLogged() || !$this->config->get('config_customer_price')) {
             if ((float)$product_info['special']) {
               $robokassa_widget_amount = $this->tax->calculate($product_info['special'], $product_info['tax_class_id'], $this->config->get('config_tax'));
