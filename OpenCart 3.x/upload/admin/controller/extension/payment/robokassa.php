@@ -14,17 +14,54 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $this->load->model('localisation/language');
 
         if (($this->request->server['REQUEST_METHOD'] == 'POST') && $this->validate()) {
+            $is_update_request = isset($this->request->post['robokassa_action']) && $this->request->post['robokassa_action'] === 'update_methods';
+            $methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
+            $is_first_sync = !$methods_initialized;
 
             $this->model_setting_setting->editSetting('payment_robokassa', $this->request->post);
-            $this->session->data['success'] = $this->language->get('text_success');
 
+            if ($is_update_request || $is_first_sync) {
+                $merchant_login = trim((string)$this->request->post['payment_robokassa_login']);
+                $aliases = $this->fetchInstallmentAliases($merchant_login);
+
+                if ($aliases === false) {
+                    $this->session->data['error_warning'] = 'Не удалось обновить способы оплаты. Проверьте логин магазина и доступ к WebService.';
+                    $this->response->redirect($this->url->link('extension/payment/robokassa', 'user_token=' . $this->session->data['user_token'], true));
+
+                    return;
+                }
+
+                $this->model_setting_setting->editSetting('payment_robokassa_methods', array(
+                    'payment_robokassa_methods_login' => $merchant_login,
+                    'payment_robokassa_methods_initialized' => 1
+                ));
+            }
+
+            if ($is_update_request) {
+                $this->session->data['success'] = 'Список способов оплаты обновлен.';
+                $this->response->redirect($this->url->link('extension/payment/robokassa', 'user_token=' . $this->session->data['user_token'], true));
+
+                return;
+            }
+
+            $this->session->data['success'] = $this->language->get('text_success');
             $this->response->redirect($this->url->link('marketplace/extension', 'user_token=' . $this->session->data['user_token'] . '&type=payment', true));
         }
 
-        if (isset($this->error['warning'])) {
+        if (isset($this->session->data['error_warning'])) {
+            $data['error_warning'] = $this->session->data['error_warning'];
+            unset($this->session->data['error_warning']);
+        } elseif (isset($this->error['warning'])) {
             $data['error_warning'] = $this->error['warning'];
         } else {
             $data['error_warning'] = '';
+        }
+
+        if (isset($this->session->data['success'])) {
+            $data['success'] = $this->session->data['success'];
+            unset($this->session->data['success']);
+        } else {
+            $data['success'] = '';
         }
 
         if (isset($this->error['merch_login'])) {
@@ -89,6 +126,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $data['entry_geo_zone'] = $this->language->get('entry_geo_zone');
         $data['entry_status'] = $this->language->get('entry_status');
         $data['entry_sort_order'] = $this->language->get('entry_sort_order');
+        $data['button_update_methods'] = 'Обновить способы оплаты';
         $data['entry_country'] = $this->language->get('entry_country');
         $data['entry_iframe'] = $this->language->get('entry_iframe');
 		$data['entry_product_options'] = $this->language->get('entry_product_options');
@@ -97,7 +135,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
             ? $entry_widget_status
             : 'Показывать виджет BNPL в карточке товара';
 
-        $data['help_fiscal'] = $this->language->get('help_fiscal');
+        $data['help_fiscal'] = $this->language->get('help_fiscal') . ' Для корректной работы способов оплаты через рассрочку и виджетов в карточке товара этот параметр должен быть включен.';
         $data['help_iframe'] = $this->language->get('help_iframe');
         $help_widget_status = $this->language->get('help_widget_status');
         $data['help_widget_status'] = ($help_widget_status && $help_widget_status !== 'help_widget_status')
@@ -139,6 +177,14 @@ class ControllerExtensionPaymentRobokassa extends Controller
         } else {
             $data['payment_robokassa_test_password_2'] = $this->config->get('payment_robokassa_test_password_2');
         }
+
+        $current_login_for_sync = trim((string)$data['payment_robokassa_login']);
+        $current_password1_for_sync = trim((string)$data['payment_robokassa_password_1']);
+        $current_password2_for_sync = trim((string)$data['payment_robokassa_password_2']);
+        $data['show_update_methods'] = (int)$this->config->get('payment_robokassa_methods_initialized') === 1
+            && $current_login_for_sync !== ''
+            && $current_password1_for_sync !== ''
+            && $current_password2_for_sync !== '';
 
         if (!empty($_SERVER['HTTPS']) && 'off' !== strtolower($_SERVER['HTTPS'])) {
             $data['payment_robokassa_result_url'] = 'https://' . $_SERVER['SERVER_NAME'] . '/index.php?route=extension/payment/robokassa/result';
@@ -335,6 +381,52 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $data['footer'] = $this->load->controller('common/footer');
 
         $this->response->setOutput($this->load->view('extension/payment/robokassa', $data));
+    }
+
+    private function fetchInstallmentAliases($merchant_login)
+    {
+        $merchant_login = trim((string)$merchant_login);
+
+        if ($merchant_login === '') {
+            return false;
+        }
+
+        $currency_url = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/GetCurrencies?MerchantLogin=' . rawurlencode($merchant_login) . '&Language=ru';
+        $currency_xml = false;
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($currency_url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+            $currency_xml = curl_exec($ch);
+            curl_close($ch);
+        }
+
+        if ($currency_xml === false && ini_get('allow_url_fopen')) {
+            $context = stream_context_create(array(
+                'http' => array(
+                    'timeout' => 3
+                )
+            ));
+            $currency_xml = @file_get_contents($currency_url, false, $context);
+        }
+
+        if ($currency_xml === false || strpos($currency_xml, '<Code>0</Code>') === false) {
+            return false;
+        }
+
+        if (!preg_match_all('/\bAlias="([^"]+)"/i', $currency_xml, $aliases_match)) {
+            return array();
+        }
+
+        $aliases = array();
+
+        foreach ($aliases_match[1] as $alias) {
+            $aliases[] = strtolower((string)$alias);
+        }
+
+        return array_values(array_unique($aliases));
     }
 
     private function validate()

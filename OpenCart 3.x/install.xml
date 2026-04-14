@@ -78,7 +78,10 @@
         );
         $robokassa_bnpl_aliases = array('podeli', 'otp', 'mokka', 'yandexpaysplit');
         $robokassa_installment_aliases = array();
-        $robokassa_merchant_login = trim((string)$this->config->get('payment_robokassa_login'));
+        $robokassa_methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
+        $robokassa_current_login = trim((string)$this->config->get('payment_robokassa_login'));
+        $robokassa_saved_login = trim((string)$this->config->get('payment_robokassa_methods_login'));
+        $robokassa_merchant_login = ($robokassa_methods_initialized && $robokassa_current_login !== '' && $robokassa_saved_login === $robokassa_current_login) ? $robokassa_saved_login : '';
 
         if ($robokassa_merchant_login !== '') {
           $robokassa_currency_url = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/GetCurrencies?MerchantLogin=' . rawurlencode($robokassa_merchant_login) . '&Language=ru';
@@ -139,7 +142,10 @@
           );
           $robokassa_bnpl_aliases = array('podeli', 'otp', 'mokka', 'yandexpaysplit');
           $robokassa_installment_aliases = array();
-          $robokassa_merchant_login = trim((string)$this->config->get('payment_robokassa_login'));
+          $robokassa_methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
+          $robokassa_current_login = trim((string)$this->config->get('payment_robokassa_login'));
+          $robokassa_saved_login = trim((string)$this->config->get('payment_robokassa_methods_login'));
+          $robokassa_merchant_login = ($robokassa_methods_initialized && $robokassa_current_login !== '' && $robokassa_saved_login === $robokassa_current_login) ? $robokassa_saved_login : '';
 
           if ($robokassa_merchant_login !== '') {
             $robokassa_currency_url = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/GetCurrencies?MerchantLogin=' . rawurlencode($robokassa_merchant_login) . '&Language=ru';
