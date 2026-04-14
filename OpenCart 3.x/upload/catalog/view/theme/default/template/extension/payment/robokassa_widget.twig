@@ -1,4 +1,4 @@
-<div class="robokassa-product-widget" id="robokassa-product-widget" data-product-id="{{ product_id }}" data-widget-url="{{ widget_data_url }}">
+<div class="robokassa-product-widget" id="robokassa-product-widget" data-product-id="{{ product_id }}" data-widget-url="{{ widget_data_url }}" data-checkout-url="{{ checkout_url }}">
     {% if show_bnpl %}
         <div class="robokassa-product-widget__item robokassa-product-widget__item--bnpl">
             <robokassa-widget
@@ -13,7 +13,9 @@
                     type="bnpl"
                     email="{{ email }}"
                     hasSecondLine="true"
-                    mode="payment">
+                    mode="checkout"
+                    checkoutUrl="{{ checkout_url }}"
+                    oncheckout="robokassaProductWidgetCheckoutBnpl">
             </robokassa-widget>
         </div>
     {% endif %}
@@ -29,9 +31,12 @@
                     borderRadius="12"
                     descriptionPosition="right"
                     type="credit"
+                    paymentMethod="OTP"
                     email="{{ email }}"
                     hasSecondLine="false"
-                    mode="payment">
+                    mode="checkout"
+                    checkoutUrl="{{ checkout_url }}"
+                    oncheckout="robokassaProductWidgetCheckoutCredit">
             </robokassa-widget>
         </div>
     {% endif %}
@@ -39,25 +44,275 @@
 
 <script src="https://auth.robokassa.ru/merchant/bundle/robokassa-iframe-badge.js"></script>
 <script>
+	window.robokassaProductWidgetCheckoutBnpl = function (payload) {
+		if (typeof window.robokassaProductWidgetSubmitCheckout === 'function') {
+			return window.robokassaProductWidgetSubmitCheckout(payload, 'bnpl');
+		}
+
+		return true;
+	};
+
+	window.robokassaProductWidgetCheckoutCredit = function (payload) {
+		if (typeof window.robokassaProductWidgetSubmitCheckout === 'function') {
+			return window.robokassaProductWidgetSubmitCheckout(payload, 'credit');
+		}
+
+		return true;
+	};
+
 	document.addEventListener('DOMContentLoaded', function () {
 		var container = document.getElementById('robokassa-product-widget');
 		if (!container) {
 			return;
 		}
 
-		if (typeof window.initRobokassaBadges === 'function') {
-			window.initRobokassaBadges();
-		}
-
-		var quantityInput = document.getElementById('input-quantity') || document.querySelector('input[name="quantity"]');
 		var productId = container.getAttribute('data-product-id');
 		var widgetDataUrl = container.getAttribute('data-widget-url');
+		var checkoutUrl = container.getAttribute('data-checkout-url');
+		var productForm = document.getElementById('product');
 
-		if (!quantityInput || !productId || !widgetDataUrl) {
+		if (!productId || !widgetDataUrl) {
 			return;
 		}
 
 		var updateTimer = null;
+
+		function getQuantityInput() {
+			var selectors = [
+				'#input-quantity',
+				'input[name="quantity"]',
+				'#product input[name="quantity"]',
+				'#product input[id*="quantity"]',
+				'#product input[type="number"]'
+			];
+
+			for (var i = 0; i < selectors.length; i++) {
+				var input = document.querySelector(selectors[i]);
+
+				if (input) {
+					return input;
+				}
+			}
+
+			return null;
+		}
+
+		function getQuantityValue() {
+			var input = getQuantityInput();
+			var quantity = input ? parseInt(input.value, 10) : 1;
+
+			if (!quantity || quantity < 1) {
+				quantity = 1;
+			}
+
+			return quantity;
+		}
+
+		function normalizePaymentMethod(value, fallbackType) {
+			var normalized = String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+			if (!normalized && fallbackType === 'credit') {
+				return 'robokassa_credit';
+			}
+
+			if (normalized.indexOf('otp') !== -1 || normalized.indexOf('credit') !== -1) {
+				return 'robokassa_credit';
+			}
+
+			if (normalized.indexOf('podeli') !== -1) {
+				return 'robokassa_podeli';
+			}
+
+			if (normalized.indexOf('mokka') !== -1) {
+				return 'robokassa_mokka';
+			}
+
+			if (normalized.indexOf('yandex') !== -1 || normalized.indexOf('split') !== -1) {
+				return 'robokassa_yandex_split';
+			}
+
+			return '';
+		}
+
+		function extractPaymentMethod(payload, fallbackType) {
+			if (!payload) {
+				return normalizePaymentMethod('', fallbackType);
+			}
+
+			if (payload.detail) {
+				return extractPaymentMethod(payload.detail, fallbackType);
+			}
+
+			if (typeof payload === 'string') {
+				return normalizePaymentMethod(payload, fallbackType);
+			}
+
+			if (Object.prototype.toString.call(payload) === '[object Array]') {
+				for (var i = 0; i < payload.length; i++) {
+					var itemMethod = extractPaymentMethod(payload[i], fallbackType);
+
+					if (itemMethod) {
+						return itemMethod;
+					}
+				}
+
+				return normalizePaymentMethod('', fallbackType);
+			}
+
+			var keys = ['paymentMethod', 'payment_method', 'payment_method_hint', 'method', 'currLabel', 'curr_label', 'label', 'alias', 'incCurrLabel', 'IncCurrLabel', 'type'];
+
+			for (var j = 0; j < keys.length; j++) {
+				if (payload[keys[j]]) {
+					var method = normalizePaymentMethod(payload[keys[j]], fallbackType);
+
+					if (method) {
+						return method;
+					}
+				}
+			}
+
+			for (var key in payload) {
+				if (!Object.prototype.hasOwnProperty.call(payload, key)) {
+					continue;
+				}
+
+				if (payload[key] && typeof payload[key] === 'object') {
+					var nestedMethod = extractPaymentMethod(payload[key], fallbackType);
+
+					if (nestedMethod) {
+						return nestedMethod;
+					}
+				}
+			}
+
+			return normalizePaymentMethod('', fallbackType);
+		}
+
+		function appendFormField(form, name, value) {
+			var input = document.createElement('input');
+			input.type = 'hidden';
+			input.name = name;
+			input.value = value;
+			form.appendChild(input);
+		}
+
+		function appendOptionField(form, name, value) {
+			if (Object.prototype.toString.call(value) === '[object Array]') {
+				for (var i = 0; i < value.length; i++) {
+					appendOptionField(form, name + '[]', value[i]);
+				}
+
+				return;
+			}
+
+			appendFormField(form, name, value);
+		}
+
+		function appendSelectedProductData(form) {
+			if (!productForm) {
+				return;
+			}
+
+			var fields = productForm.querySelectorAll('input[name^="option["], select[name^="option["], textarea[name^="option["], input[name="recurring_id"], select[name="recurring_id"]');
+
+			for (var i = 0; i < fields.length; i++) {
+				var field = fields[i];
+
+				if (!field.name) {
+					continue;
+				}
+
+				if ((field.type === 'checkbox' || field.type === 'radio') && !field.checked) {
+					continue;
+				}
+
+				if (field.tagName === 'SELECT' && field.multiple) {
+					for (var k = 0; k < field.options.length; k++) {
+						if (field.options[k].selected) {
+							appendOptionField(form, field.name, field.options[k].value);
+						}
+					}
+
+					continue;
+				}
+
+				appendOptionField(form, field.name, field.value);
+			}
+		}
+
+		function submitCheckout(payload, fallbackType) {
+			if (!checkoutUrl) {
+				return false;
+			}
+
+			var quantity = getQuantityValue();
+
+			var form = document.createElement('form');
+			form.method = 'post';
+			form.action = checkoutUrl;
+			form.style.display = 'none';
+
+			appendFormField(form, 'product_id', productId);
+			appendFormField(form, 'quantity', quantity);
+			appendFormField(form, 'payment_method', extractPaymentMethod(payload, fallbackType));
+
+			try {
+				appendFormField(form, 'widget_payload', JSON.stringify(payload || {}));
+			} catch (e) {
+				appendFormField(form, 'widget_payload', '');
+			}
+
+			appendSelectedProductData(form);
+
+			document.body.appendChild(form);
+			form.submit();
+
+			return false;
+		}
+
+		function bindWidgetHandlers() {
+			var bnplWidget = container.querySelector('.robokassa-product-widget__item--bnpl robokassa-widget');
+			var creditWidget = container.querySelector('.robokassa-product-widget__item--credit robokassa-widget');
+
+			if (bnplWidget) {
+				bnplWidget.oncheckout = function (payload) {
+					return submitCheckout(payload, 'bnpl');
+				};
+			}
+
+			if (creditWidget) {
+				creditWidget.oncheckout = function (payload) {
+					return submitCheckout(payload, 'credit');
+				};
+			}
+		}
+
+		function updateCheckoutUrls() {
+			var quantity = getQuantityValue();
+			var separator = checkoutUrl.indexOf('?') === -1 ? '?' : '&';
+			var bnplUrl = checkoutUrl + separator + 'product_id=' + encodeURIComponent(productId) + '&quantity=' + encodeURIComponent(quantity);
+			var creditUrl = bnplUrl + '&payment_method=' + encodeURIComponent('robokassa_credit');
+
+			var bnplWidget = container.querySelector('.robokassa-product-widget__item--bnpl robokassa-widget');
+			var creditWidget = container.querySelector('.robokassa-product-widget__item--credit robokassa-widget');
+
+			if (bnplWidget) {
+				bnplWidget.setAttribute('checkoutUrl', bnplUrl);
+			}
+
+			if (creditWidget) {
+				creditWidget.setAttribute('checkoutUrl', creditUrl);
+			}
+		}
+
+		window.robokassaProductWidgetSubmitCheckout = submitCheckout;
+
+		bindWidgetHandlers();
+		updateCheckoutUrls();
+
+		if (typeof window.initRobokassaBadges === 'function') {
+			window.initRobokassaBadges();
+		}
 
 		function applyWidgetData(payload) {
 			var widgets = container.querySelectorAll('robokassa-widget');
@@ -81,13 +336,12 @@
 			}
 
 			container.style.display = (payload.show_bnpl || payload.show_credit) ? '' : 'none';
+			bindWidgetHandlers();
+			updateCheckoutUrls();
 		}
 
 		function requestWidgetData() {
-			var quantity = parseInt(quantityInput.value, 10);
-			if (!quantity || quantity < 1) {
-				quantity = 1;
-			}
+			var quantity = getQuantityValue();
 
 			var separator = widgetDataUrl.indexOf('?') === -1 ? '?' : '&';
 			var xhr = new XMLHttpRequest();
@@ -125,8 +379,31 @@
 			}, 200);
 		}
 
-		quantityInput.addEventListener('input', scheduleUpdate);
-		quantityInput.addEventListener('change', scheduleUpdate);
+		function isQuantityTarget(target) {
+			if (!target || !target.matches) {
+				return false;
+			}
+
+			return target.matches('#input-quantity, input[name="quantity"], #product input[name="quantity"], #product input[id*="quantity"], #product input[type="number"]');
+		}
+
+		document.addEventListener('input', function (event) {
+			if (!isQuantityTarget(event.target)) {
+				return;
+			}
+
+			updateCheckoutUrls();
+			scheduleUpdate();
+		}, true);
+
+		document.addEventListener('change', function (event) {
+			if (!isQuantityTarget(event.target)) {
+				return;
+			}
+
+			updateCheckoutUrls();
+			scheduleUpdate();
+		}, true);
 	});
 </script>
 

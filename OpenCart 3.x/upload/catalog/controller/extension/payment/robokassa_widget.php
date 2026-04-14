@@ -2,6 +2,17 @@
 
 class ControllerExtensionPaymentRobokassaWidget extends Controller
 {
+    private function getRequestValue(array $source, array $keys, $default = '')
+    {
+        foreach ($keys as $key) {
+            if (isset($source[$key])) {
+                return $source[$key];
+            }
+        }
+
+        return $default;
+    }
+
     private function isWidgetEnabled()
     {
         $store_id = (int)$this->config->get('config_store_id');
@@ -32,6 +43,17 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
         }
 
         return $this->config->get('payment_robokassa_password_1');
+    }
+
+    private function getCheckoutUrl($product_id = 0)
+    {
+        $query = '';
+
+        if ((int)$product_id > 0) {
+            $query = 'product_id=' . (int)$product_id;
+        }
+
+        return html_entity_decode($this->url->link('extension/payment/robokassa_widget/checkout', $query, $this->isSecureRequest()), ENT_QUOTES, 'UTF-8');
     }
 
     private function getDisplayAmount($product_info)
@@ -70,6 +92,148 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
     private function isBnplEnabledForAmount($amount)
     {
         return $amount > 0;
+    }
+
+    private function normalizePaymentCode($value)
+    {
+        $normalized = strtolower((string)$value);
+        $normalized = preg_replace('/[^a-z0-9]+/', '', $normalized);
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        if ($normalized === 'robokassacredit' || strpos($normalized, 'otp') !== false || strpos($normalized, 'credit') !== false) {
+            return 'robokassa_credit';
+        }
+
+        if ($normalized === 'robokassapodeli' || strpos($normalized, 'podeli') !== false) {
+            return 'robokassa_podeli';
+        }
+
+        if ($normalized === 'robokassamokka' || strpos($normalized, 'mokka') !== false) {
+            return 'robokassa_mokka';
+        }
+
+        if ($normalized === 'robokassayandexsplit'
+            || strpos($normalized, 'yandex') !== false
+            || strpos($normalized, 'yandexpaysplit') !== false
+            || strpos($normalized, 'split') !== false) {
+            return 'robokassa_yandex_split';
+        }
+
+        return '';
+    }
+
+    private function extractPaymentCodeFromPayload($payload)
+    {
+        if (is_array($payload)) {
+            $keys = array(
+                'payment_method',
+                'paymentMethod',
+                'payment_method_hint',
+                'method',
+                'currLabel',
+                'curr_label',
+                'label',
+                'alias',
+                'incCurrLabel',
+                'IncCurrLabel',
+                'type'
+            );
+
+            foreach ($keys as $key) {
+                if (!empty($payload[$key])) {
+                    $payment_code = $this->normalizePaymentCode($payload[$key]);
+
+                    if ($payment_code !== '') {
+                        return $payment_code;
+                    }
+                }
+            }
+
+            foreach ($payload as $value) {
+                if (is_array($value) || is_string($value)) {
+                    $payment_code = $this->extractPaymentCodeFromPayload($value);
+
+                    if ($payment_code !== '') {
+                        return $payment_code;
+                    }
+                }
+            }
+
+            return '';
+        }
+
+        if (!is_string($payload)) {
+            return '';
+        }
+
+        $payload = trim($payload);
+
+        if ($payload === '') {
+            return '';
+        }
+
+        $decoded = json_decode($payload, true);
+
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $payment_code = $this->extractPaymentCodeFromPayload($decoded);
+
+            if ($payment_code !== '') {
+                return $payment_code;
+            }
+        }
+
+        $parsed = array();
+        parse_str(html_entity_decode($payload, ENT_QUOTES, 'UTF-8'), $parsed);
+
+        if ($parsed) {
+            $payment_code = $this->extractPaymentCodeFromPayload($parsed);
+
+            if ($payment_code !== '') {
+                return $payment_code;
+            }
+        }
+
+        return $this->normalizePaymentCode($payload);
+    }
+
+    private function resolveSelectedPaymentCode()
+    {
+        $direct_keys = array(
+            'payment_method',
+            'paymentMethod',
+            'payment_method_hint',
+            'currLabel',
+            'curr_label',
+            'alias',
+            'type'
+        );
+
+        foreach ($direct_keys as $key) {
+            if (isset($this->request->post[$key])) {
+                $payment_code = $this->extractPaymentCodeFromPayload($this->request->post[$key]);
+
+                if ($payment_code !== '') {
+                    return $payment_code;
+                }
+            }
+        }
+
+        $payload_keys = array('widget_payload', 'payload', 'event');
+
+        foreach ($payload_keys as $key) {
+            if (isset($this->request->post[$key])) {
+                $payment_code = $this->extractPaymentCodeFromPayload($this->request->post[$key]);
+
+                if ($payment_code !== '') {
+                    return $payment_code;
+                }
+            }
+        }
+
+        return '';
     }
 
     private function buildReceipt($product_info, $quantity, $unit_amount)
@@ -167,6 +331,56 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
         )));
     }
 
+    public function checkout()
+    {
+        $product_id = (int)$this->getRequestValue($this->request->post, array('product_id'));
+
+        if (!$product_id) {
+            $product_id = (int)$this->getRequestValue($this->request->get, array('product_id'));
+        }
+
+        $quantity = (int)$this->getRequestValue($this->request->post, array('quantity'), 1);
+
+        if (!$quantity) {
+            $quantity = (int)$this->getRequestValue($this->request->get, array('quantity'), 1);
+        }
+
+        $quantity = $quantity > 0 ? $quantity : 1;
+
+        $option = $this->getRequestValue($this->request->post, array('option'), array());
+        $option = is_array($option) ? $option : array();
+
+        $recurring_id = (int)$this->getRequestValue($this->request->post, array('recurring_id'), 0);
+
+        if ($product_id > 0) {
+            $this->cart->add($product_id, $quantity, $option, $recurring_id);
+
+            unset($this->session->data['shipping_method']);
+            unset($this->session->data['shipping_methods']);
+            unset($this->session->data['payment_method']);
+            unset($this->session->data['payment_methods']);
+            unset($this->session->data['reward']);
+        }
+
+        $selected_payment_code = $this->resolveSelectedPaymentCode();
+
+        if ($selected_payment_code === '') {
+            $selected_payment_code = $this->extractPaymentCodeFromPayload($this->request->get);
+        }
+
+        if ($selected_payment_code !== '') {
+            $this->session->data['robokassa_widget_payment_code'] = $selected_payment_code;
+
+            if (isset($this->session->data['payment_methods'][$selected_payment_code])) {
+                $this->session->data['payment_method'] = $this->session->data['payment_methods'][$selected_payment_code];
+            }
+        } else {
+            unset($this->session->data['robokassa_widget_payment_code']);
+        }
+
+        $this->response->redirect($this->url->link('checkout/checkout', '', true));
+    }
+
     public function index($setting = array())
     {
         $product_id = !empty($setting['product_id']) ? (int)$setting['product_id'] : 0;
@@ -193,6 +407,7 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
         $data['show_credit'] = $widget_data['show_credit'];
         $data['product_id'] = $widget_data['product_id'];
         $data['widget_data_url'] = html_entity_decode($this->url->link('extension/payment/robokassa_widget/data', '', $this->isSecureRequest()), ENT_QUOTES, 'UTF-8');
+        $data['checkout_url'] = $this->getCheckoutUrl($widget_data['product_id']);
 
         return $this->load->view('extension/payment/robokassa_widget', $data);
     }

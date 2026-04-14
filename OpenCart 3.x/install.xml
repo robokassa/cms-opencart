@@ -65,6 +65,24 @@
       ]]></add>
     </operation>
   </file>
+  <file path="catalog/controller/checkout/payment_method.php">
+    <operation>
+      <search regex="true"><![CDATA[~\$this->session->data\['payment_methods'\]\s*=\s*\$method_data;~]]></search>
+      <add position="after"><![CDATA[
+        $this->session->data['payment_methods'] = $method_data;
+
+        if (isset($this->session->data['robokassa_widget_payment_code'])) {
+          $robokassa_widget_payment_code = (string)$this->session->data['robokassa_widget_payment_code'];
+
+          if ($robokassa_widget_payment_code !== '' && isset($method_data[$robokassa_widget_payment_code])) {
+            $this->session->data['payment_method'] = $method_data[$robokassa_widget_payment_code];
+          }
+
+          unset($this->session->data['robokassa_widget_payment_code']);
+        }
+      ]]></add>
+    </operation>
+  </file>
   <file path="admin/controller/extension/extension/payment.php">
     <operation>
       <search><![CDATA[$data['extensions'] = array();]]></search>
