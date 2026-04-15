@@ -45,6 +45,58 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
         return $this->config->get('payment_robokassa_password_1');
     }
 
+    private function getWidgetConfigValue($key, $default = '')
+    {
+        $value = $this->config->get($key);
+
+        return ($value === null || $value === '') ? $default : $value;
+    }
+
+    private function normalizeWidgetChoice($value, array $allowed, $default)
+    {
+        $value = strtolower(trim((string)$value));
+
+        return in_array($value, $allowed, true) ? $value : $default;
+    }
+
+    private function normalizeWidgetBoolean($value, $default = true)
+    {
+        if ($value === null || $value === '') {
+            return $default ? 'true' : 'false';
+        }
+
+        return (int)$value ? 'true' : 'false';
+    }
+
+    private function normalizeWidgetBorderRadius($value, $default)
+    {
+        $value = trim((string)$value);
+
+        if ($value === '' || !preg_match('/^\d+$/', $value)) {
+            return (string)$default;
+        }
+
+        return $value;
+    }
+
+    private function getWidgetViewSettings()
+    {
+        return array(
+            'bnpl_theme' => $this->normalizeWidgetChoice($this->getWidgetConfigValue('payment_robokassa_widget_bnpl_theme', 'light'), array('light', 'dark'), 'light'),
+            'bnpl_size' => $this->normalizeWidgetChoice($this->getWidgetConfigValue('payment_robokassa_widget_bnpl_size', 'm'), array('s', 'm'), 'm'),
+            'bnpl_show_logo' => $this->normalizeWidgetBoolean($this->getWidgetConfigValue('payment_robokassa_widget_bnpl_show_logo', 1), true),
+            'bnpl_border_radius' => $this->normalizeWidgetBorderRadius($this->getWidgetConfigValue('payment_robokassa_widget_bnpl_border_radius', '50'), '50'),
+            'bnpl_has_second_line' => $this->normalizeWidgetBoolean($this->getWidgetConfigValue('payment_robokassa_widget_bnpl_has_second_line', 1), true),
+            'bnpl_description_position' => $this->normalizeWidgetChoice($this->getWidgetConfigValue('payment_robokassa_widget_bnpl_description_position', 'right'), array('left', 'right'), 'right'),
+            'credit_theme' => $this->normalizeWidgetChoice($this->getWidgetConfigValue('payment_robokassa_widget_credit_theme', 'dark'), array('light', 'dark'), 'dark'),
+            'credit_size' => $this->normalizeWidgetChoice($this->getWidgetConfigValue('payment_robokassa_widget_credit_size', 'm'), array('s', 'm'), 'm'),
+            'credit_show_logo' => $this->normalizeWidgetBoolean($this->getWidgetConfigValue('payment_robokassa_widget_credit_show_logo', 1), true),
+            'credit_border_radius' => $this->normalizeWidgetBorderRadius($this->getWidgetConfigValue('payment_robokassa_widget_credit_border_radius', '12'), '12'),
+            'credit_has_second_line' => $this->normalizeWidgetBoolean($this->getWidgetConfigValue('payment_robokassa_widget_credit_has_second_line', 0), false),
+            'credit_description_position' => $this->normalizeWidgetChoice($this->getWidgetConfigValue('payment_robokassa_widget_credit_description_position', 'right'), array('left', 'right'), 'right')
+        );
+    }
+
     private function getCheckoutUrl($product_id = 0)
     {
         $query = '';
@@ -398,6 +450,8 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
             return '';
         }
 
+        $widget_view_settings = $this->getWidgetViewSettings();
+
         $data['merchant_login'] = $widget_data['merchant_login'];
         $data['out_sum'] = $widget_data['out_sum'];
         $data['receipt'] = $widget_data['receipt'];
@@ -408,6 +462,18 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
         $data['product_id'] = $widget_data['product_id'];
         $data['widget_data_url'] = html_entity_decode($this->url->link('extension/payment/robokassa_widget/data', '', $this->isSecureRequest()), ENT_QUOTES, 'UTF-8');
         $data['checkout_url'] = $this->getCheckoutUrl($widget_data['product_id']);
+        $data['bnpl_theme'] = $widget_view_settings['bnpl_theme'];
+        $data['bnpl_size'] = $widget_view_settings['bnpl_size'];
+        $data['bnpl_show_logo'] = $widget_view_settings['bnpl_show_logo'];
+        $data['bnpl_border_radius'] = $widget_view_settings['bnpl_border_radius'];
+        $data['bnpl_has_second_line'] = $widget_view_settings['bnpl_has_second_line'];
+        $data['bnpl_description_position'] = $widget_view_settings['bnpl_description_position'];
+        $data['credit_theme'] = $widget_view_settings['credit_theme'];
+        $data['credit_size'] = $widget_view_settings['credit_size'];
+        $data['credit_show_logo'] = $widget_view_settings['credit_show_logo'];
+        $data['credit_border_radius'] = $widget_view_settings['credit_border_radius'];
+        $data['credit_has_second_line'] = $widget_view_settings['credit_has_second_line'];
+        $data['credit_description_position'] = $widget_view_settings['credit_description_position'];
 
         return $this->load->view('extension/payment/robokassa_widget', $data);
     }

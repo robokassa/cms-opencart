@@ -41,6 +41,140 @@
                             </select>
                         </div>
                     </div>
+
+                    <fieldset>
+                        <legend>{{ text_widget_bnpl }}</legend>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-bnpl-theme">{{ entry_bnpl_theme }}</label>
+                            <div class="col-sm-10">
+                                <select name="payment_robokassa_widget_bnpl_theme" id="input-bnpl-theme" class="form-control">
+                                    <option value="light" {% if payment_robokassa_widget_bnpl_theme == 'light' %}selected="selected"{% endif %}>{{ text_light }}</option>
+                                    <option value="dark" {% if payment_robokassa_widget_bnpl_theme == 'dark' %}selected="selected"{% endif %}>{{ text_dark }}</option>
+                                </select>
+                                <small class="text-muted">{{ help_bnpl_theme }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-bnpl-size">{{ entry_bnpl_size }}</label>
+                            <div class="col-sm-10">
+                                <select name="payment_robokassa_widget_bnpl_size" id="input-bnpl-size" class="form-control">
+                                    <option value="s" {% if payment_robokassa_widget_bnpl_size == 's' %}selected="selected"{% endif %}>{{ text_size_s }}</option>
+                                    <option value="m" {% if payment_robokassa_widget_bnpl_size == 'm' %}selected="selected"{% endif %}>{{ text_size_m }}</option>
+                                </select>
+                                <small class="text-muted">{{ help_bnpl_size }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-bnpl-show-logo">{{ entry_bnpl_show_logo }}</label>
+                            <div class="col-sm-10">
+                                <select name="payment_robokassa_widget_bnpl_show_logo" id="input-bnpl-show-logo" class="form-control">
+                                    <option value="1" {% if payment_robokassa_widget_bnpl_show_logo %}selected="selected"{% endif %}>{{ text_enabled }}</option>
+                                    <option value="0" {% if not payment_robokassa_widget_bnpl_show_logo %}selected="selected"{% endif %}>{{ text_disabled }}</option>
+                                </select>
+                                <small class="text-muted">{{ help_bnpl_show_logo }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-bnpl-border-radius">{{ entry_bnpl_border_radius }}</label>
+                            <div class="col-sm-10">
+                                <input type="text" name="payment_robokassa_widget_bnpl_border_radius" value="{{ payment_robokassa_widget_bnpl_border_radius }}" placeholder="50" id="input-bnpl-border-radius" class="form-control" />
+                                <small class="text-muted">{{ help_bnpl_border_radius }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-bnpl-has-second-line">{{ entry_bnpl_has_second_line }}</label>
+                            <div class="col-sm-10">
+                                <select name="payment_robokassa_widget_bnpl_has_second_line" id="input-bnpl-has-second-line" class="form-control">
+                                    <option value="1" {% if payment_robokassa_widget_bnpl_has_second_line %}selected="selected"{% endif %}>{{ text_enabled }}</option>
+                                    <option value="0" {% if not payment_robokassa_widget_bnpl_has_second_line %}selected="selected"{% endif %}>{{ text_disabled }}</option>
+                                </select>
+                                <small class="text-muted">{{ help_bnpl_has_second_line }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-bnpl-description-position">{{ entry_bnpl_description_position }}</label>
+                            <div class="col-sm-10">
+                                <select name="payment_robokassa_widget_bnpl_description_position" id="input-bnpl-description-position" class="form-control">
+                                    <option value="left" {% if payment_robokassa_widget_bnpl_description_position == 'left' %}selected="selected"{% endif %}>{{ text_left }}</option>
+                                    <option value="right" {% if payment_robokassa_widget_bnpl_description_position == 'right' %}selected="selected"{% endif %}>{{ text_right }}</option>
+                                </select>
+                                <small class="text-muted">{{ help_bnpl_description_position }}</small>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>{{ text_widget_credit }}</legend>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-credit-theme">{{ entry_credit_theme }}</label>
+                            <div class="col-sm-10">
+                                <select name="payment_robokassa_widget_credit_theme" id="input-credit-theme" class="form-control">
+                                    <option value="light" {% if payment_robokassa_widget_credit_theme == 'light' %}selected="selected"{% endif %}>{{ text_light }}</option>
+                                    <option value="dark" {% if payment_robokassa_widget_credit_theme == 'dark' %}selected="selected"{% endif %}>{{ text_dark }}</option>
+                                </select>
+                                <small class="text-muted">{{ help_credit_theme }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-credit-size">{{ entry_credit_size }}</label>
+                            <div class="col-sm-10">
+                                <select name="payment_robokassa_widget_credit_size" id="input-credit-size" class="form-control">
+                                    <option value="s" {% if payment_robokassa_widget_credit_size == 's' %}selected="selected"{% endif %}>{{ text_size_s }}</option>
+                                    <option value="m" {% if payment_robokassa_widget_credit_size == 'm' %}selected="selected"{% endif %}>{{ text_size_m }}</option>
+                                </select>
+                                <small class="text-muted">{{ help_credit_size }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-credit-show-logo">{{ entry_credit_show_logo }}</label>
+                            <div class="col-sm-10">
+                                <select name="payment_robokassa_widget_credit_show_logo" id="input-credit-show-logo" class="form-control">
+                                    <option value="1" {% if payment_robokassa_widget_credit_show_logo %}selected="selected"{% endif %}>{{ text_enabled }}</option>
+                                    <option value="0" {% if not payment_robokassa_widget_credit_show_logo %}selected="selected"{% endif %}>{{ text_disabled }}</option>
+                                </select>
+                                <small class="text-muted">{{ help_credit_show_logo }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-credit-border-radius">{{ entry_credit_border_radius }}</label>
+                            <div class="col-sm-10">
+                                <input type="text" name="payment_robokassa_widget_credit_border_radius" value="{{ payment_robokassa_widget_credit_border_radius }}" placeholder="12" id="input-credit-border-radius" class="form-control" />
+                                <small class="text-muted">{{ help_credit_border_radius }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-credit-has-second-line">{{ entry_credit_has_second_line }}</label>
+                            <div class="col-sm-10">
+                                <select name="payment_robokassa_widget_credit_has_second_line" id="input-credit-has-second-line" class="form-control">
+                                    <option value="1" {% if payment_robokassa_widget_credit_has_second_line %}selected="selected"{% endif %}>{{ text_enabled }}</option>
+                                    <option value="0" {% if not payment_robokassa_widget_credit_has_second_line %}selected="selected"{% endif %}>{{ text_disabled }}</option>
+                                </select>
+                                <small class="text-muted">{{ help_credit_has_second_line }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-2 control-label" for="input-credit-description-position">{{ entry_credit_description_position }}</label>
+                            <div class="col-sm-10">
+                                <select name="payment_robokassa_widget_credit_description_position" id="input-credit-description-position" class="form-control">
+                                    <option value="left" {% if payment_robokassa_widget_credit_description_position == 'left' %}selected="selected"{% endif %}>{{ text_left }}</option>
+                                    <option value="right" {% if payment_robokassa_widget_credit_description_position == 'right' %}selected="selected"{% endif %}>{{ text_right }}</option>
+                                </select>
+                                <small class="text-muted">{{ help_credit_description_position }}</small>
+                            </div>
+                        </div>
+                    </fieldset>
                 </form>
             </div>
         </div>
