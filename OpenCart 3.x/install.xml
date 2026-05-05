@@ -69,6 +69,35 @@
     <operation>
       <search regex="true"><![CDATA[~\$this->session->data\['payment_methods'\]\s*=\s*\$method_data;~]]></search>
       <add position="after"><![CDATA[
+        $robokassa_graph_methods = array(
+          'robokassa_mokka' => 'Mokka',
+          'robokassa_podeli' => 'Podeli',
+          'robokassa_yandex_split' => 'YandexPaySplit'
+        );
+        $robokassa_graph_login = trim((string)$this->config->get('payment_robokassa_login'));
+        $robokassa_graph_enabled = $this->config->get('payment_robokassa_status')
+          && $this->config->get('payment_robokassa_country') == 'RUB'
+          && $robokassa_graph_login !== ''
+          && (float)$total > 0;
+
+        if ($robokassa_graph_enabled) {
+          $robokassa_graph_out_sum = number_format((float)$total, 2, '.', '');
+
+          foreach ($method_data as $robokassa_graph_code => &$robokassa_graph_method) {
+            if (!isset($robokassa_graph_methods[$robokassa_graph_code])) {
+              continue;
+            }
+
+            $robokassa_graph_method['robokassa_graph_payment_method'] = $robokassa_graph_methods[$robokassa_graph_code];
+            $robokassa_graph_method['robokassa_graph_merchant_login'] = $robokassa_graph_login;
+            $robokassa_graph_method['robokassa_graph_out_sum'] = $robokassa_graph_out_sum;
+          }
+          unset($robokassa_graph_method);
+        }
+
+        $data['robokassa_graph_enabled'] = $robokassa_graph_enabled;
+        $data['robokassa_graph_script'] = 'https://auth.robokassa.ru/merchantbeta/bundle/robokassa-iframe-badge.js';
+
         $this->session->data['payment_methods'] = $method_data;
 
         if (isset($this->session->data['robokassa_widget_payment_code'])) {
@@ -80,6 +109,154 @@
 
           unset($this->session->data['robokassa_widget_payment_code']);
         }
+      ]]></add>
+    </operation>
+  </file>
+  <file path="catalog/view/theme/*/template/checkout/payment_method.twig">
+    <operation>
+      <search regex="true"><![CDATA[~\{\% if payment_method\.terms \%\}\s*\(\{\{ payment_method\.terms \}\}\)\s*\{\% endif \%\}\s*</label>~]]></search>
+      <add position="after"><![CDATA[
+        {% if payment_method.robokassa_graph_payment_method %}
+        <div class="robokassa-checkout-graph" data-payment-method="{{ payment_method.robokassa_graph_payment_method }}">
+          <robokassa-graph
+                  merchantLogin="{{ payment_method.robokassa_graph_merchant_login }}"
+                  outSum="{{ payment_method.robokassa_graph_out_sum }}"
+                  paymentMethod="{{ payment_method.robokassa_graph_payment_method }}">
+          </robokassa-graph>
+        </div>
+        {% endif %}
+      ]]></add>
+    </operation>
+    <operation>
+      <search><![CDATA[<p><strong>{{ text_comments }}</strong></p>]]></search>
+      <add position="before"><![CDATA[
+        {% if robokassa_graph_enabled %}
+        <script type="text/javascript">
+        (function() {
+          function syncRobokassaCheckoutGraphs() {
+            var graphContainers = document.querySelectorAll('.robokassa-checkout-graph');
+            var activeMethods = [];
+
+            for (var i = 0; i < graphContainers.length; i++) {
+              var graphContainer = graphContainers[i];
+              var radioWrapper = graphContainer.closest('.radio');
+              var radioInput = radioWrapper ? radioWrapper.querySelector('input[name="payment_method"]') : null;
+              var isActive = !!(radioInput && radioInput.checked);
+
+              if (radioWrapper) {
+                if (isActive) {
+                  radioWrapper.classList.add('robokassa-checkout-payment--active');
+                } else {
+                  radioWrapper.classList.remove('robokassa-checkout-payment--active');
+                }
+              }
+
+              if (isActive) {
+                graphContainer.classList.add('is-active');
+
+                if (graphContainer.getAttribute('data-payment-method')) {
+                  activeMethods.push(graphContainer.getAttribute('data-payment-method'));
+                }
+              } else {
+                graphContainer.classList.remove('is-active');
+              }
+            }
+
+            if (typeof window.initRobokassaGraphs === 'function' && activeMethods.length) {
+              window.initRobokassaGraphs(activeMethods.length === 1 ? activeMethods[0] : activeMethods);
+            }
+          }
+
+          function bindRobokassaCheckoutGraphs() {
+            var radios = document.querySelectorAll('input[name="payment_method"]');
+
+            for (var i = 0; i < radios.length; i++) {
+              if (radios[i].getAttribute('data-robokassa-graph-bound') === '1') {
+                continue;
+              }
+
+              radios[i].setAttribute('data-robokassa-graph-bound', '1');
+              radios[i].addEventListener('change', syncRobokassaCheckoutGraphs);
+            }
+          }
+
+          function initRobokassaCheckoutGraphs() {
+            bindRobokassaCheckoutGraphs();
+            syncRobokassaCheckoutGraphs();
+          }
+
+          if (window.__robokassaCheckoutGraphsLoading) {
+            var waitInterval = window.setInterval(function() {
+              if (typeof window.initRobokassaGraphs === 'function') {
+                window.clearInterval(waitInterval);
+                initRobokassaCheckoutGraphs();
+              }
+            }, 100);
+
+            window.setTimeout(function() {
+              window.clearInterval(waitInterval);
+            }, 5000);
+
+            return;
+          }
+
+          if (typeof window.initRobokassaGraphs === 'function') {
+            initRobokassaCheckoutGraphs();
+            return;
+          }
+
+          window.__robokassaCheckoutGraphsLoading = true;
+
+          var script = document.createElement('script');
+          script.src = '{{ robokassa_graph_script }}';
+          script.onload = function() {
+            window.__robokassaCheckoutGraphsLoading = false;
+            initRobokassaCheckoutGraphs();
+          };
+          script.onerror = function() {
+            window.__robokassaCheckoutGraphsLoading = false;
+          };
+
+          document.head.appendChild(script);
+        })();
+        </script>
+        <style>
+         .robokassa-checkout-payment--active {
+           padding: 12px 14px 14px;
+           border: 1px solid #2f2f2f;
+           border-radius: 8px;
+           margin: 0 0 12px;
+           box-sizing: border-box;
+           overflow: visible;
+         }
+
+         .robokassa-checkout-payment--active > label {
+           display: block;
+           margin-bottom: 10px;
+         }
+
+         .robokassa-checkout-graph {
+           display: none;
+           position: relative;
+           width: 690px;
+           max-width: 100%;
+           margin: 6px 0 0 0;
+           box-sizing: border-box;
+           overflow: visible;
+         }
+
+         .robokassa-checkout-graph.is-active {
+           display: block;
+         }
+
+         .robokassa-checkout-graph robokassa-graph {
+           display: block;
+           width: 690px;
+           max-width: 100%;
+           box-sizing: border-box;
+         }
+        </style>
+        {% endif %}
       ]]></add>
     </operation>
   </file>
