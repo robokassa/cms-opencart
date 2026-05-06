@@ -1,34 +1,396 @@
 <modification>
   <code>Robokassa</code>
   <name>Robokassa opencart</name>
-  <version>1.0.4</version>
+  <version>1.0.5</version>
   <author>Robokassa</author>
   <link>https://robokassa.com</link>
   <file path="catalog/controller/api/order.php">
     <operation>
       <search><![CDATA[$this->model_checkout_order->addOrderHistory($order_id, $this->request->post['order_status_id'], $this->request->post['comment'], $this->request->post['notify'], $this->request->post['override']);]]></search>
       <add position="before"><![CDATA[
-        // Итоговый чек
+        // Final check
         if($order_info['order_status_id'] != $this->request->post['order_status_id'] && $order_info['payment_code'] == 'robokassa' && $this->request->post['order_status_id'] == $this->config->get('payment_robokassa_order_status_id_2check') && $this->config->get('payment_robokassa_fiscal') == 1){
 		  $this->load->model('extension/payment/robokassa');
 
 		  $this->model_extension_payment_robokassa->sendSecondCheck($order_id);
 		}
-        // Итоговый чек
+        // Final check
 
-        // Добавленное условие для вызова robokassa_hold_confirm
+        // Added condition for robokassa_hold_confirm
         if ($order_info['order_status_id'] == 1 && $this->request->post['order_status_id'] == 2) {
           $this->load->model('extension/payment/robokassa');
           $this->model_extension_payment_robokassa->robokassa_hold_confirm($order_id);
         }
-        // Добавленное условие для вызова robokassa_hold_confirm
+        // Added condition for robokassa_hold_confirm
 
-        // Добавленное условие для вызова robokassa_hold_cancel
+        // Added condition for robokassa_hold_cancel
         if ($order_info['order_status_id'] == 1 && $this->request->post['order_status_id'] == 7) {
           $this->load->model('extension/payment/robokassa');
           $this->model_extension_payment_robokassa->robokassa_hold_cancel($order_id);
         }
-        // Добавленное условие для вызова robokassa_hold_cancel
+        // Added condition for robokassa_hold_cancel
+      ]]></add>
+    </operation>
+  </file>
+  <file path="catalog/controller/product/product.php">
+    <operation>
+      <search regex="true"><![CDATA[~\$data\['review_status'\]\s*=\s*\$this->config->get\('config_review_status'\);~]]></search>
+      <add position="before"><![CDATA[
+        $data['robokassa_widget'] = '';
+
+        if ($this->config->get('payment_robokassa_country') == 'RUB') {
+          if ($this->customer->isLogged() || !$this->config->get('config_customer_price')) {
+            if ((float)$product_info['special']) {
+              $robokassa_widget_amount = $this->tax->calculate($product_info['special'], $product_info['tax_class_id'], $this->config->get('config_tax'));
+            } else {
+              $robokassa_widget_amount = $this->tax->calculate($product_info['price'], $product_info['tax_class_id'], $this->config->get('config_tax'));
+            }
+
+            if ($robokassa_widget_amount > 0) {
+              $data['robokassa_widget'] = $this->load->controller('extension/payment/robokassa_widget', array(
+                'product_id' => $product_id,
+                'quantity' => isset($this->request->get['quantity']) ? (int)$this->request->get['quantity'] : $data['minimum']
+              ));
+            }
+          }
+        }
+      ]]></add>
+    </operation>
+  </file>
+  <file path="catalog/view/theme/*/template/product/product.twig">
+    <operation>
+      <search><![CDATA[<div id="product">]]></search>
+      <add position="before"><![CDATA[
+        {{ robokassa_widget }}
+      ]]></add>
+    </operation>
+  </file>
+  <file path="catalog/controller/checkout/payment_method.php">
+    <operation>
+      <search regex="true"><![CDATA[~\$this->session->data\['payment_methods'\]\s*=\s*\$method_data;~]]></search>
+      <add position="after"><![CDATA[
+        $robokassa_graph_methods = array(
+          'robokassa_mokka' => 'Mokka',
+          'robokassa_podeli' => 'Podeli',
+          'robokassa_yandex_split' => 'YandexPaySplit'
+        );
+        $robokassa_graph_login = trim((string)$this->config->get('payment_robokassa_login'));
+        $robokassa_graph_enabled = $this->config->get('payment_robokassa_status')
+          && $this->config->get('payment_robokassa_country') == 'RUB'
+          && $robokassa_graph_login !== ''
+          && (float)$total > 0;
+
+        if ($robokassa_graph_enabled) {
+          $robokassa_graph_out_sum = number_format((float)$total, 2, '.', '');
+
+          foreach ($method_data as $robokassa_graph_code => &$robokassa_graph_method) {
+            if (!isset($robokassa_graph_methods[$robokassa_graph_code])) {
+              continue;
+            }
+
+            $robokassa_graph_method['robokassa_graph_payment_method'] = $robokassa_graph_methods[$robokassa_graph_code];
+            $robokassa_graph_method['robokassa_graph_merchant_login'] = $robokassa_graph_login;
+            $robokassa_graph_method['robokassa_graph_out_sum'] = $robokassa_graph_out_sum;
+          }
+          unset($robokassa_graph_method);
+        }
+
+        $data['robokassa_graph_enabled'] = $robokassa_graph_enabled;
+        $data['robokassa_graph_script'] = 'https://auth.robokassa.ru/merchantbeta/bundle/robokassa-iframe-badge.js';
+
+        $this->session->data['payment_methods'] = $method_data;
+
+        if (isset($this->session->data['robokassa_widget_payment_code'])) {
+          $robokassa_widget_payment_code = (string)$this->session->data['robokassa_widget_payment_code'];
+
+          if ($robokassa_widget_payment_code !== '' && isset($method_data[$robokassa_widget_payment_code])) {
+            $this->session->data['payment_method'] = $method_data[$robokassa_widget_payment_code];
+          }
+
+          unset($this->session->data['robokassa_widget_payment_code']);
+        }
+      ]]></add>
+    </operation>
+  </file>
+  <file path="catalog/view/theme/*/template/checkout/payment_method.twig">
+    <operation>
+      <search regex="true"><![CDATA[~\{\% if payment_method\.terms \%\}\s*\(\{\{ payment_method\.terms \}\}\)\s*\{\% endif \%\}\s*</label>~]]></search>
+      <add position="after"><![CDATA[
+        {% if payment_method.robokassa_graph_payment_method %}
+        <div class="robokassa-checkout-graph" data-payment-method="{{ payment_method.robokassa_graph_payment_method }}">
+          <robokassa-graph
+                  merchantLogin="{{ payment_method.robokassa_graph_merchant_login }}"
+                  outSum="{{ payment_method.robokassa_graph_out_sum }}"
+                  paymentMethod="{{ payment_method.robokassa_graph_payment_method }}">
+          </robokassa-graph>
+        </div>
+        {% endif %}
+      ]]></add>
+    </operation>
+    <operation>
+      <search><![CDATA[<p><strong>{{ text_comments }}</strong></p>]]></search>
+      <add position="before"><![CDATA[
+        {% if robokassa_graph_enabled %}
+        <script type="text/javascript">
+        (function() {
+          function syncRobokassaCheckoutGraphs() {
+            var graphContainers = document.querySelectorAll('.robokassa-checkout-graph');
+            var activeMethods = [];
+
+            for (var i = 0; i < graphContainers.length; i++) {
+              var graphContainer = graphContainers[i];
+              var radioWrapper = graphContainer.closest('.radio');
+              var radioInput = radioWrapper ? radioWrapper.querySelector('input[name="payment_method"]') : null;
+              var isActive = !!(radioInput && radioInput.checked);
+
+              if (radioWrapper) {
+                if (isActive) {
+                  radioWrapper.classList.add('robokassa-checkout-payment--active');
+                } else {
+                  radioWrapper.classList.remove('robokassa-checkout-payment--active');
+                }
+              }
+
+              if (isActive) {
+                graphContainer.classList.add('is-active');
+
+                if (graphContainer.getAttribute('data-payment-method')) {
+                  activeMethods.push(graphContainer.getAttribute('data-payment-method'));
+                }
+              } else {
+                graphContainer.classList.remove('is-active');
+              }
+            }
+
+            if (typeof window.initRobokassaGraphs === 'function' && activeMethods.length) {
+              window.initRobokassaGraphs(activeMethods.length === 1 ? activeMethods[0] : activeMethods);
+            }
+          }
+
+          function bindRobokassaCheckoutGraphs() {
+            var radios = document.querySelectorAll('input[name="payment_method"]');
+
+            for (var i = 0; i < radios.length; i++) {
+              if (radios[i].getAttribute('data-robokassa-graph-bound') === '1') {
+                continue;
+              }
+
+              radios[i].setAttribute('data-robokassa-graph-bound', '1');
+              radios[i].addEventListener('change', syncRobokassaCheckoutGraphs);
+            }
+          }
+
+          function initRobokassaCheckoutGraphs() {
+            bindRobokassaCheckoutGraphs();
+            syncRobokassaCheckoutGraphs();
+          }
+
+          if (window.__robokassaCheckoutGraphsLoading) {
+            var waitInterval = window.setInterval(function() {
+              if (typeof window.initRobokassaGraphs === 'function') {
+                window.clearInterval(waitInterval);
+                initRobokassaCheckoutGraphs();
+              }
+            }, 100);
+
+            window.setTimeout(function() {
+              window.clearInterval(waitInterval);
+            }, 5000);
+
+            return;
+          }
+
+          if (typeof window.initRobokassaGraphs === 'function') {
+            initRobokassaCheckoutGraphs();
+            return;
+          }
+
+          window.__robokassaCheckoutGraphsLoading = true;
+
+          var script = document.createElement('script');
+          script.src = '{{ robokassa_graph_script }}';
+          script.onload = function() {
+            window.__robokassaCheckoutGraphsLoading = false;
+            initRobokassaCheckoutGraphs();
+          };
+          script.onerror = function() {
+            window.__robokassaCheckoutGraphsLoading = false;
+          };
+
+          document.head.appendChild(script);
+        })();
+        </script>
+        <style>
+         .robokassa-checkout-payment--active {
+           padding: 12px 14px 14px;
+           border: 1px solid #2f2f2f;
+           border-radius: 8px;
+           margin: 0 0 12px;
+           box-sizing: border-box;
+           overflow: visible;
+         }
+
+         .robokassa-checkout-payment--active > label {
+           display: block;
+           margin-bottom: 10px;
+         }
+
+         .robokassa-checkout-graph {
+           display: none;
+           position: relative;
+           width: 690px;
+           max-width: 100%;
+           margin: 6px 0 0 0;
+           box-sizing: border-box;
+           overflow: visible;
+         }
+
+         .robokassa-checkout-graph.is-active {
+           display: block;
+         }
+
+         .robokassa-checkout-graph robokassa-graph {
+           display: block;
+           width: 690px;
+           max-width: 100%;
+           box-sizing: border-box;
+         }
+        </style>
+        {% endif %}
+      ]]></add>
+    </operation>
+  </file>
+  <file path="admin/controller/extension/extension/payment.php">
+    <operation>
+      <search><![CDATA[$data['extensions'] = array();]]></search>
+      <add position="after"><![CDATA[
+        $robokassa_installment_map = array(
+          'robokassa_podeli' => 'podeli',
+          'robokassa_credit' => 'otp',
+          'robokassa_mokka' => 'mokka',
+          'robokassa_yandex_split' => 'yandexpaysplit',
+          'robokassa_split' => 'yandexpaysplit'
+        );
+        $robokassa_bnpl_aliases = array('podeli', 'otp', 'mokka', 'yandexpaysplit');
+        $robokassa_installment_aliases = array();
+        $robokassa_methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
+        $robokassa_current_login = trim((string)$this->config->get('payment_robokassa_login'));
+        $robokassa_saved_login = trim((string)$this->config->get('payment_robokassa_methods_login'));
+        $robokassa_merchant_login = ($robokassa_methods_initialized && $robokassa_current_login !== '' && $robokassa_saved_login === $robokassa_current_login) ? $robokassa_saved_login : '';
+
+        if ($robokassa_merchant_login !== '') {
+          $robokassa_currency_url = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/GetCurrencies?MerchantLogin=' . rawurlencode($robokassa_merchant_login) . '&Language=ru';
+          $robokassa_currency_xml = false;
+
+          if (function_exists('curl_init')) {
+            $robokassa_ch = curl_init($robokassa_currency_url);
+            curl_setopt($robokassa_ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($robokassa_ch, CURLOPT_CONNECTTIMEOUT, 3);
+            curl_setopt($robokassa_ch, CURLOPT_TIMEOUT, 3);
+            $robokassa_currency_xml = curl_exec($robokassa_ch);
+            curl_close($robokassa_ch);
+          }
+
+          if ($robokassa_currency_xml === false && ini_get('allow_url_fopen')) {
+            $robokassa_currency_context = stream_context_create(array(
+              'http' => array(
+                'timeout' => 3
+              )
+            ));
+            $robokassa_currency_xml = @file_get_contents($robokassa_currency_url, false, $robokassa_currency_context);
+          }
+
+          if ($robokassa_currency_xml !== false && strpos($robokassa_currency_xml, '<Code>0</Code>') !== false && preg_match_all('/\bAlias="([^"]+)"/i', $robokassa_currency_xml, $robokassa_aliases_match)) {
+            foreach ($robokassa_aliases_match[1] as $robokassa_alias) {
+              $robokassa_installment_aliases[] = strtolower((string)$robokassa_alias);
+            }
+
+            $robokassa_installment_aliases = array_unique($robokassa_installment_aliases);
+          }
+        }
+      ]]></add>
+    </operation>
+    <operation>
+      <search><![CDATA[$extension = basename($file, '.php');]]></search>
+      <add position="after"><![CDATA[
+        if (isset($robokassa_installment_map[$extension]) && !in_array($robokassa_installment_map[$extension], $robokassa_installment_aliases, true)) {
+          continue;
+        }
+
+        if ($extension == 'robokassa_widget' && !array_intersect($robokassa_bnpl_aliases, $robokassa_installment_aliases)) {
+          continue;
+        }
+      ]]></add>
+    </operation>
+  </file>
+  <file path="admin/controller/marketplace/extension.php">
+    <operation>
+      <search><![CDATA[$files = safe_glob(DIR_APPLICATION . 'controller/extension/' . $extension . '/*.php', GLOB_BRACE);]]></search>
+      <add position="after"><![CDATA[
+        if ($extension == 'payment' && $files) {
+          $robokassa_installment_map = array(
+            'robokassa_podeli' => 'podeli',
+            'robokassa_credit' => 'otp',
+            'robokassa_mokka' => 'mokka',
+            'robokassa_yandex_split' => 'yandexpaysplit',
+            'robokassa_split' => 'yandexpaysplit'
+          );
+          $robokassa_bnpl_aliases = array('podeli', 'otp', 'mokka', 'yandexpaysplit');
+          $robokassa_installment_aliases = array();
+          $robokassa_methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
+          $robokassa_current_login = trim((string)$this->config->get('payment_robokassa_login'));
+          $robokassa_saved_login = trim((string)$this->config->get('payment_robokassa_methods_login'));
+          $robokassa_merchant_login = ($robokassa_methods_initialized && $robokassa_current_login !== '' && $robokassa_saved_login === $robokassa_current_login) ? $robokassa_saved_login : '';
+
+          if ($robokassa_merchant_login !== '') {
+            $robokassa_currency_url = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/GetCurrencies?MerchantLogin=' . rawurlencode($robokassa_merchant_login) . '&Language=ru';
+            $robokassa_currency_xml = false;
+
+            if (function_exists('curl_init')) {
+              $robokassa_ch = curl_init($robokassa_currency_url);
+              curl_setopt($robokassa_ch, CURLOPT_RETURNTRANSFER, true);
+              curl_setopt($robokassa_ch, CURLOPT_CONNECTTIMEOUT, 3);
+              curl_setopt($robokassa_ch, CURLOPT_TIMEOUT, 3);
+              $robokassa_currency_xml = curl_exec($robokassa_ch);
+              curl_close($robokassa_ch);
+            }
+
+            if ($robokassa_currency_xml === false && ini_get('allow_url_fopen')) {
+              $robokassa_currency_context = stream_context_create(array(
+                'http' => array(
+                  'timeout' => 3
+                )
+              ));
+              $robokassa_currency_xml = @file_get_contents($robokassa_currency_url, false, $robokassa_currency_context);
+            }
+
+            if ($robokassa_currency_xml !== false && strpos($robokassa_currency_xml, '<Code>0</Code>') !== false && preg_match_all('/\bAlias="([^"]+)"/i', $robokassa_currency_xml, $robokassa_aliases_match)) {
+              foreach ($robokassa_aliases_match[1] as $robokassa_alias) {
+                $robokassa_installment_aliases[] = strtolower((string)$robokassa_alias);
+              }
+
+              $robokassa_installment_aliases = array_unique($robokassa_installment_aliases);
+            }
+          }
+
+          $robokassa_payment_files = array();
+
+          foreach ($files as $robokassa_file) {
+            $robokassa_code = basename($robokassa_file, '.php');
+
+            if (isset($robokassa_installment_map[$robokassa_code]) && !in_array($robokassa_installment_map[$robokassa_code], $robokassa_installment_aliases, true)) {
+              continue;
+            }
+
+            if ($robokassa_code == 'robokassa_widget' && !array_intersect($robokassa_bnpl_aliases, $robokassa_installment_aliases)) {
+              continue;
+            }
+
+            $robokassa_payment_files[] = $robokassa_file;
+          }
+
+          $files = $robokassa_payment_files;
+        }
       ]]></add>
     </operation>
   </file>
