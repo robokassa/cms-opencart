@@ -96,7 +96,7 @@
         }
 
         $data['robokassa_graph_enabled'] = $robokassa_graph_enabled;
-        $data['robokassa_graph_script'] = 'https://auth.robokassa.ru/merchantbeta/bundle/robokassa-iframe-badge.js';
+        $data['robokassa_graph_script'] = 'https://auth.robokassa.ru/merchant/bundle/robokassa-iframe-badge.js';
 
         $this->session->data['payment_methods'] = $method_data;
 
@@ -268,6 +268,7 @@
           'robokassa_podeli' => 'podeli',
           'robokassa_credit' => 'otp',
           'robokassa_mokka' => 'mokka',
+          'robokassa_sbp' => 'sbp',
           'robokassa_yandex_split' => 'yandexpaysplit',
           'robokassa_split' => 'yandexpaysplit'
         );
@@ -332,6 +333,7 @@
             'robokassa_podeli' => 'podeli',
             'robokassa_credit' => 'otp',
             'robokassa_mokka' => 'mokka',
+            'robokassa_sbp' => 'sbp',
             'robokassa_yandex_split' => 'yandexpaysplit',
             'robokassa_split' => 'yandexpaysplit'
           );

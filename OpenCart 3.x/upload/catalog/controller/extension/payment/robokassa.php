@@ -2,6 +2,84 @@
 
 class ControllerExtensionPaymentRobokassa extends Controller
 {
+    private function normalizeShpSignatureKey($key)
+    {
+        $lower_key = strtolower((string)$key);
+        $known_map = array(
+            'shp_item' => 'Shp_item',
+            'shp_label' => 'shp_label',
+            'shp_merchant_id' => 'Shp_merchant_id',
+            'shp_order_id' => 'Shp_order_id',
+            'shp_result_url' => 'Shp_result_url'
+        );
+
+        if (isset($known_map[$lower_key])) {
+            return $known_map[$lower_key];
+        }
+
+        return $key;
+    }
+
+    private function buildResultSignature($out_summ, $order_id, $password, array $request_data)
+    {
+        $parts = array(
+            $out_summ,
+            $order_id,
+            $password
+        );
+
+        $shp_params = array();
+
+        foreach ($request_data as $key => $value) {
+            if (stripos($key, 'shp_') === 0) {
+                $shp_params[$key] = $value;
+            }
+        }
+
+        if ($shp_params) {
+            uksort($shp_params, 'strcasecmp');
+
+            foreach ($shp_params as $key => $value) {
+                $parts[] = $key . '=' . $value;
+            }
+        }
+
+        return strtoupper(md5(implode(':', $parts)));
+    }
+
+    private function isValidResultSignature($out_summ, $order_id, $password, array $request_data, $signature)
+    {
+        $signature = strtoupper((string)$signature);
+        $variants = array();
+
+        $variants[] = $this->buildResultSignature($out_summ, $order_id, $password, $request_data);
+
+        $normalized_request_data = $request_data;
+
+        foreach ($request_data as $key => $value) {
+            if (stripos($key, 'shp_') !== 0) {
+                continue;
+            }
+
+            $normalized_key = $this->normalizeShpSignatureKey($key);
+
+            if ($normalized_key !== $key) {
+                unset($normalized_request_data[$key]);
+                $normalized_request_data[$normalized_key] = $value;
+            }
+        }
+
+        $variants[] = $this->buildResultSignature($out_summ, $order_id, $password, $normalized_request_data);
+
+        foreach (array_unique($variants) as $candidate) {
+            if ($candidate === $signature) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 	/**
 	 * Формирует название товара для отправки в чек Robokassa.
 	 *
@@ -277,9 +355,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         $crc = strtoupper($crc);
 
-        $my_crc = strtoupper(md5($out_summ . ":" . $order_id . ":" . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
-
-        if ($my_crc == $crc) {
+        if ($this->isValidResultSignature($out_summ, $order_id, $password_1, $this->request->post, $crc)) {
             $this->load->model('checkout/order');
 
             $order_info = $this->model_checkout_order->getOrder($order_id);
@@ -328,9 +404,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         $crc = strtoupper($crc);
 
-        $my_crc = strtoupper(md5($out_summ . ":" . $order_id . ":" . $password_2 . ":Shp_item=1" . ":Shp_label=official_opencart"));
-
-        if ($my_crc == $crc) {
+        if ($this->isValidResultSignature($out_summ, $order_id, $password_2, $this->request->post, $crc)) {
             $this->load->model('checkout/order');
 
             $order_info = $this->model_checkout_order->getOrder($order_id);
