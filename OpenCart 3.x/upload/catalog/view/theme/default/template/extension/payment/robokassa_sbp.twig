@@ -1,0 +1,278 @@
+<div class="robokassa-sbp-payment">
+    {% if error_message %}
+        <div class="alert alert-danger">{{ error_message }}</div>
+    {% else %}
+        <div class="robokassa-sbp-payment__card">
+            <div class="robokassa-sbp-payment__label">{{ text_qr_label }}</div>
+            <div class="robokassa-sbp-payment__caption">{{ text_qr_caption }}</div>
+            <div class="robokassa-sbp-payment__qr-shell">
+                <div id="{{ qr_container_id }}" class="robokassa-sbp-payment__qr"></div>
+            </div>
+            <div class="robokassa-sbp-payment__status" id="robokassa-sbp-status-{{ inv_id }}">{{ text_qr_wait }}</div>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    .robokassa-sbp-payment {
+        max-width: 430px;
+        margin-top: 12px;
+    }
+
+    .robokassa-sbp-payment__card {
+        border: 1px solid #e3e6ea;
+        border-radius: 16px;
+        background: #ffffff;
+        padding: 18px 18px 16px;
+        box-sizing: border-box;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    }
+
+    .robokassa-sbp-payment__label {
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.35;
+        color: #4a4f57;
+        margin-bottom: 6px;
+    }
+
+    .robokassa-sbp-payment__caption {
+        margin-bottom: 14px;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .robokassa-sbp-payment__qr-shell {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: {{ qr_container_size }}px;
+        margin-bottom: 12px;
+        padding: 10px;
+        border-radius: 12px;
+        background: #ffffff;
+    }
+
+    .robokassa-sbp-payment__qr {
+        width: {{ qr_container_size }}px;
+        max-width: 100%;
+        min-height: {{ qr_container_size }}px;
+    }
+
+    .robokassa-sbp-payment__qr iframe,
+    .robokassa-sbp-payment__qr canvas,
+    .robokassa-sbp-payment__qr svg,
+    .robokassa-sbp-payment__qr img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .robokassa-sbp-payment__status {
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    @media (max-width: 480px) {
+        .robokassa-sbp-payment {
+            max-width: 100%;
+        }
+
+        .robokassa-sbp-payment__card {
+            padding: 14px;
+        }
+
+        .robokassa-sbp-payment__qr-shell,
+        .robokassa-sbp-payment__qr {
+            min-height: auto;
+        }
+    }
+</style>
+
+{% if not error_message %}
+<script type="text/javascript">
+(function() {
+    var state = window.robokassaSbpState || (window.robokassaSbpState = {});
+    var statusNode = document.getElementById('robokassa-sbp-status-{{ inv_id }}');
+    var statusUrl = {{ status_url_js|raw }};
+    var successUrl = {{ success_url_js|raw }};
+    var qrContainerId = {{ qr_container_id_js|raw }};
+    var shpParams = {{ shp_params_js|raw }};
+    var merchantScriptSrc = 'https://auth.robokassa.ru/merchant/bundle/robokassa-iframe-badge.js';
+    var stateKey = 'order_{{ inv_id }}';
+    var pollInterval = 1000;
+
+    function setStatus(text) {
+        if (statusNode) {
+            statusNode.textContent = text;
+        }
+    }
+
+    function hasStartOp() {
+        return !!(window.Robokassa && window.Robokassa.pay && typeof window.Robokassa.pay.startOp === 'function');
+    }
+
+    function hasMerchantScriptTag() {
+        var scripts = document.getElementsByTagName('script');
+
+        for (var i = 0; i < scripts.length; i++) {
+            if (scripts[i].src && scripts[i].src.indexOf(merchantScriptSrc) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function stopPolling() {
+        if (state[stateKey] && state[stateKey].intervalId) {
+            window.clearInterval(state[stateKey].intervalId);
+            state[stateKey].intervalId = null;
+        }
+    }
+
+    function pollStatus() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', statusUrl, true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== 4) {
+                return;
+            }
+
+            if (xhr.status < 200 || xhr.status >= 300) {
+                return;
+            }
+
+            try {
+                var response = JSON.parse(xhr.responseText);
+
+                if (response && response.paid) {
+                    stopPolling();
+                    window.location.href = response.success_url || successUrl;
+                }
+            } catch (e) {}
+        };
+        xhr.send();
+    }
+
+    function startPolling() {
+        state[stateKey] = state[stateKey] || {};
+        stopPolling();
+        pollStatus();
+        state[stateKey].intervalId = window.setInterval(pollStatus, pollInterval);
+    }
+
+    function buildOptions() {
+        var options = {
+            paymentMethod: 'SBP',
+            email: {{ email_js|raw }},
+            merchantLogin: {{ robokassa_login_js|raw }},
+            outSum: {{ out_summ_js|raw }},
+            invId: {{ inv_id_js|raw }},
+            signature: {{ signature_js|raw }},
+            qrContainerId: qrContainerId,
+            qrContainerSize: {{ qr_container_size }},
+            onpaymentlink: function(url) {
+                state[stateKey].paymentLink = url;
+            }
+        };
+
+        var receipt = {{ receipt_js|raw }};
+
+        if (receipt) {
+            options.receipt = receipt;
+        }
+
+        if (shpParams) {
+            for (var key in shpParams) {
+                if (Object.prototype.hasOwnProperty.call(shpParams, key)) {
+                    options[key] = shpParams[key];
+                }
+            }
+        }
+
+        return options;
+    }
+
+    function startPayment() {
+        if (state[stateKey] && state[stateKey].started) {
+            return;
+        }
+
+        if (!hasStartOp()) {
+            setStatus({{ text_qr_error_js|raw }});
+            return;
+        }
+
+        state[stateKey] = state[stateKey] || {};
+        state[stateKey].started = true;
+
+        try {
+            setStatus({{ text_qr_wait_js|raw }});
+            startPolling();
+            window.Robokassa.pay.startOp(buildOptions());
+        } catch (e) {
+            stopPolling();
+            state[stateKey].started = false;
+            setStatus({{ text_qr_error_js|raw }});
+            if (window.console && typeof window.console.error === 'function') {
+                window.console.error('Robokassa SBP startOp failed', e);
+            }
+        }
+    }
+
+    function runWhenReady() {
+        if (document.getElementById(qrContainerId)) {
+            startPayment();
+            return;
+        }
+
+        window.setTimeout(runWhenReady, 100);
+    }
+
+    function ensureScriptAndStart() {
+        if (hasStartOp()) {
+            runWhenReady();
+            return;
+        }
+
+        if (state.merchantScriptLoading) {
+            var waitInterval = window.setInterval(function() {
+                if (hasStartOp()) {
+                    window.clearInterval(waitInterval);
+                    runWhenReady();
+                }
+            }, 100);
+
+            window.setTimeout(function() {
+                window.clearInterval(waitInterval);
+            }, 5000);
+
+            return;
+        }
+
+        state.merchantScriptLoading = true;
+
+        var script = document.createElement('script');
+        script.src = merchantScriptSrc;
+        script.async = true;
+        script.setAttribute('data-robokassa-sbp-bundle', '1');
+        script.onload = function() {
+            state.merchantScriptLoading = false;
+            runWhenReady();
+        };
+        script.onerror = function() {
+            state.merchantScriptLoading = false;
+            setStatus({{ text_qr_error_js|raw }});
+        };
+
+        document.head.appendChild(script);
+    }
+
+    ensureScriptAndStart();
+})();
+</script>
+{% endif %}
