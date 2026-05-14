@@ -364,8 +364,6 @@ class ControllerExtensionPaymentRobokassa extends Controller
                 $this->model_checkout_order->addOrderHistory($order_id, $this->config->get('config_order_status_id'));
             }
 
-            $session->data['user_id'] = $this->customer->getId();
-
             $this->response->redirect($this->url->link('checkout/success', '', true));
 
         } else {
@@ -414,9 +412,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
             if ($order_info['order_status_id'] == 0) {
                 $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id);
-            }
-
-            if ($order_info['order_status_id'] != $new_order_status_id) {
+            } elseif ($order_info['order_status_id'] != $new_order_status_id) {
                 $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id);
 
                 if ($this->config->get('payment_robokassa_test')) {
@@ -466,9 +462,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
                     if ($order_info['order_status_id'] == 0) {
                         $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id);
-                    }
-
-                    if ($order_info['order_status_id'] != $new_order_status_id) {
+                    } elseif ($order_info['order_status_id'] != $new_order_status_id) {
                         $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id, $message);
                     }
 
@@ -484,9 +478,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
                     if ($order_info['order_status_id'] == 0) {
                         $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id);
-                    }
-
-                    if ($order_info['order_status_id'] != $new_order_status_id) {
+                    } elseif ($order_info['order_status_id'] != $new_order_status_id) {
                         $this->model_checkout_order->addOrderHistory($order_id, $new_order_status_id, $message);
                     }
 
