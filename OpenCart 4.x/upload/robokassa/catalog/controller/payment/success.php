@@ -5,17 +5,17 @@ class Success extends \Opencart\System\Engine\Controller {
 
     public function index(): void
     {
-        $session = $this->session;
-
         if ($this->config->get('payment_robokassa_test')) {
             $password_1 = $this->config->get('payment_robokassa_test_password_1');
         } else {
             $password_1 = $this->config->get('payment_robokassa_password_1');
         }
 
-        $out_summ = $this->request->post['OutSum'] ?? null;
-        $order_id = isset($this->request->post['InvId']) ? (int)$this->request->post['InvId'] : null;
-        $crc      = $this->request->post['SignatureValue'] ?? null;
+        $request_data = $this->request->post ?: $this->request->get;
+
+        $out_summ = $request_data['OutSum'] ?? null;
+        $order_id = isset($request_data['InvId']) ? (int)$request_data['InvId'] : null;
+        $crc      = $request_data['SignatureValue'] ?? null;
 
         if (!$out_summ || $order_id === null || !$crc) {
             $this->response->addHeader($this->request->server['SERVER_PROTOCOL'] . ' 404 Not Found');
@@ -25,9 +25,7 @@ class Success extends \Opencart\System\Engine\Controller {
 
         $crc = strtoupper($crc);
 
-        $my_crc = strtoupper(md5(
-            $out_summ . ":" . $order_id . ":" . $password_1 . ":Shp_item=1:Shp_label=official_opencart"
-        ));
+        $my_crc = $this->getSignature($out_summ, $order_id, $password_1);
 
         if ($my_crc !== $crc) {
             $this->log->write('ROBOKASSA success: signature mismatch. InvId=' . $order_id . ' OutSum=' . (string)$out_summ);
@@ -56,6 +54,46 @@ class Success extends \Opencart\System\Engine\Controller {
             $this->model_checkout_order->addHistory($order_id, (int)$this->config->get('config_order_status_id'));
         }
 
+        $this->clearCheckoutSession((int)($order_info['customer_id'] ?? 0));
+
         $this->response->redirect($this->url->link('checkout/success', '', true));
+    }
+
+    private function getSignature($out_summ, int $order_id, string $password): string
+    {
+        return strtoupper(md5($out_summ . ":" . $order_id . ":" . $password . ":Shp_item=1:Shp_label=official_opencart"));
+    }
+
+    private function clearCheckoutSession(int $order_customer_id = 0): void
+    {
+        $this->cart->clear();
+        $this->clearPersistentCart($order_customer_id);
+
+        unset($this->session->data['order_id']);
+        unset($this->session->data['payment_address']);
+        unset($this->session->data['payment_method']);
+        unset($this->session->data['payment_methods']);
+        unset($this->session->data['shipping_address']);
+        unset($this->session->data['shipping_method']);
+        unset($this->session->data['shipping_methods']);
+        unset($this->session->data['comment']);
+        unset($this->session->data['agree']);
+        unset($this->session->data['coupon']);
+        unset($this->session->data['reward']);
+        unset($this->session->data['voucher']);
+        unset($this->session->data['vouchers']);
+    }
+
+    private function clearPersistentCart(int $order_customer_id = 0): void
+    {
+        $this->db->query("DELETE FROM `" . DB_PREFIX . "cart` WHERE `session_id` = '" . $this->db->escape($this->session->getId()) . "'");
+
+        if ($this->customer->isLogged()) {
+            $this->db->query("DELETE FROM `" . DB_PREFIX . "cart` WHERE `customer_id` = '" . (int)$this->customer->getId() . "'");
+        }
+
+        if ($order_customer_id > 0) {
+            $this->db->query("DELETE FROM `" . DB_PREFIX . "cart` WHERE `customer_id` = '" . (int)$order_customer_id . "'");
+        }
     }
 }

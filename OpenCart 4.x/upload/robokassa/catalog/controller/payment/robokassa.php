@@ -10,7 +10,25 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $this->load->model('checkout/order');
 
-        $order_info = $this->model_checkout_order->getOrder($this->session->data['order_id']);
+        $order_id = (int)($this->session->data['order_id'] ?? 0);
+
+        if (!$order_id) {
+            return '';
+        }
+
+        $order_info = $this->model_checkout_order->getOrder($order_id);
+
+        if (!$order_info) {
+            unset($this->session->data['order_id']);
+
+            return $this->getCheckoutRedirectScript();
+        }
+
+        if ((int)$order_info['order_status_id'] > 0) {
+            unset($this->session->data['order_id']);
+
+            return $this->getCheckoutRedirectScript();
+        }
 
         $ruUrl = 'https://auth.robokassa.ru/Merchant/Index.aspx';
         $kzUrl = 'https://auth.robokassa.kz/Merchant/Index.aspx';
@@ -41,11 +59,11 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $data['robokassa_fiscal'] = $this->config->get('payment_robokassa_fiscal');
 
-        $data['inv_id'] = $this->session->data['order_id'];
+        $data['inv_id'] = $order_id;
 
         $data['order_desc'] = 'Покупка в ' . $this->config->get('config_name');
 
-		$data['result2_url'] = HTTP_SERVER . 'index.php?route=extension/robokassa/payment/result_hold';
+		$data['result2_url'] = $this->getCallbackUrl('extension/robokassa/payment/result_hold');
 
 		if ($this->config->get('payment_robokassa_status_hold')) {
 			$data['robokassa_status_hold'] = 1;
@@ -198,6 +216,37 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $this->load->model('extension/robokassa/payment/robokassa');
 
         $this->model_extension_payment_robokassa->sendSecondCheck(82);
+    }
+
+    private function getCheckoutRedirectScript(): string
+    {
+        $url = str_replace('&amp;', '&', $this->url->link('checkout/checkout', '', true));
+
+        return '<script type="text/javascript">location = ' . json_encode($url) . ';</script>';
+    }
+
+    private function getCallbackUrl(string $route): string
+    {
+        $server = defined('HTTPS_SERVER') && HTTPS_SERVER ? HTTPS_SERVER : HTTP_SERVER;
+
+        if ($this->isHttpsRequest()) {
+            $server = preg_replace('/^http:\/\//i', 'https://', $server);
+        }
+
+        return rtrim($server, '/') . '/index.php?route=' . $route;
+    }
+
+    private function isHttpsRequest(): bool
+    {
+        if (!empty($this->request->server['HTTPS']) && strtolower((string)$this->request->server['HTTPS']) !== 'off') {
+            return true;
+        }
+
+        if (!empty($this->request->server['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$this->request->server['HTTP_X_FORWARDED_PROTO']) === 'https') {
+            return true;
+        }
+
+        return !empty($this->request->server['HTTP_X_FORWARDED_SSL']) && strtolower((string)$this->request->server['HTTP_X_FORWARDED_SSL']) !== 'off';
     }
 
 }

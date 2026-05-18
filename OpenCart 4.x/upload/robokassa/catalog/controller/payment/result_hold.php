@@ -85,9 +85,7 @@ class ResultHold extends \Opencart\System\Engine\Controller
 
         if ((int)$order_info['order_status_id'] === 0) {
             $this->model_checkout_order->addHistory((int)$order_id, $status_id);
-        }
-
-        if ((int)$order_info['order_status_id'] !== $status_id) {
+        } elseif ((int)$order_info['order_status_id'] !== $status_id) {
             $this->model_checkout_order->addHistory((int)$order_id, $status_id, $message);
         }
     }
