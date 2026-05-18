@@ -3,6 +3,18 @@ namespace Opencart\Catalog\Model\Extension\Robokassa\Payment;
 
 class Robokassa extends \Opencart\System\Engine\Model {
 
+    public function getMethod($address)
+    {
+        $this->load->language('extension/robokassa/payment/robokassa');
+
+        return [
+            'code'       => 'robokassa',
+            'title'      => $this->language->get('text_title'),
+            'name'       => $this->language->get('text_title'),
+            'sort_order' => $this->config->get('payment_robokassa_sort_order'),
+        ];
+    }
+
     public function getMethods($address)
     {
         $this->load->language('extension/robokassa/payment/robokassa');

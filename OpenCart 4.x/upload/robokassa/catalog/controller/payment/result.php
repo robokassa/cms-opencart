@@ -11,13 +11,15 @@ class Result extends \Opencart\System\Engine\Controller {
             $password_2 = $this->config->get('payment_robokassa_password_2');
         }
 
-        $out_summ = $this->request->post['OutSum'];
-        $order_id = $this->request->post["InvId"];
-        $crc = $this->request->post["SignatureValue"];
+        $request_data = $this->request->post ?: $this->request->get;
+
+        $out_summ = $request_data['OutSum'];
+        $order_id = (int)$request_data["InvId"];
+        $crc = $request_data["SignatureValue"];
 
         $crc = strtoupper($crc);
 
-        $my_crc = strtoupper(md5($out_summ . ":" . $order_id . ":" . $password_2 . ":Shp_item=1" . ":Shp_label=official_opencart"));
+        $my_crc = $this->getSignature($out_summ, $order_id, $password_2);
 
         if ($my_crc == $crc) {
             $this->load->model('checkout/order');
@@ -29,15 +31,17 @@ class Result extends \Opencart\System\Engine\Controller {
 
             if ($order_info['order_status_id'] == 0) {
                 $this->model_checkout_order->addHistory($order_id, $new_order_status_id);
-            }
-
-            if ($order_info['order_status_id'] != $new_order_status_id) {
+            } elseif ($order_info['order_status_id'] != $new_order_status_id) {
                 $this->model_checkout_order->addHistory($order_id, $new_order_status_id);
 
                 if ($this->config->get('payment_robokassa_test')) {
                     $this->log->write('ROBOKASSA в заказе: ' . $order_id . '. Статус заказа успешно изменен');
                 }
 
+            }
+
+            if ($order_info) {
+                $this->clearPersistentCart((int)($order_info['customer_id'] ?? 0));
             }
 
             return true;
@@ -50,5 +54,17 @@ class Result extends \Opencart\System\Engine\Controller {
 
         }
 
+    }
+
+    private function getSignature($out_summ, int $order_id, string $password): string
+    {
+        return strtoupper(md5($out_summ . ":" . $order_id . ":" . $password . ":Shp_item=1:Shp_label=official_opencart"));
+    }
+
+    private function clearPersistentCart(int $order_customer_id = 0): void
+    {
+        if ($order_customer_id > 0) {
+            $this->db->query("DELETE FROM `" . DB_PREFIX . "cart` WHERE `customer_id` = '" . (int)$order_customer_id . "'");
+        }
     }
 }
