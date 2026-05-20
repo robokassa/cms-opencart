@@ -341,6 +341,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
     public function success()
     {
         $session = $this->session;
+        $request_data = array_merge($this->request->get, $this->request->post);
 
         if ($this->config->get('payment_robokassa_test')) {
             $password_1 = $this->config->get('payment_robokassa_test_password_1');
@@ -349,13 +350,13 @@ class ControllerExtensionPaymentRobokassa extends Controller
         }
 
 
-        $out_summ = $this->request->post['OutSum'];
-        $order_id = $this->request->post["InvId"];
-        $crc = $this->request->post["SignatureValue"];
+        $out_summ = isset($request_data['OutSum']) ? $request_data['OutSum'] : '';
+        $order_id = isset($request_data['InvId']) ? $request_data['InvId'] : 0;
+        $crc = isset($request_data['SignatureValue']) ? $request_data['SignatureValue'] : '';
 
         $crc = strtoupper($crc);
 
-        if ($this->isValidResultSignature($out_summ, $order_id, $password_1, $this->request->post, $crc)) {
+        if ($this->isValidResultSignature($out_summ, $order_id, $password_1, $request_data, $crc)) {
             $this->load->model('checkout/order');
 
             $order_info = $this->model_checkout_order->getOrder($order_id);

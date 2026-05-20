@@ -109,6 +109,10 @@ class Robokassa extends \Opencart\System\Engine\Controller
             $data['payment_robokassa_fail_url'] = HTTP_CATALOG . 'index.php?route=extension/robokassa/payment/fail';
         }
 
+        $data['payment_robokassa_result_method'] = 'POST';
+        $data['payment_robokassa_success_method'] = 'GET';
+        $data['payment_robokassa_fail_method'] = 'POST';
+
         $data['payment_robokassa_test'] = $this->request->post['payment_robokassa_test'] ?? $this->config->get('payment_robokassa_test');
 
         if (isset($this->request->post['payment_robokassa_country'])) {
