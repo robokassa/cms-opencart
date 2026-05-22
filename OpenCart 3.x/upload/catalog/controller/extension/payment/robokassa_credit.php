@@ -95,7 +95,9 @@ class ControllerExtensionPaymentRobokassaCredit extends Controller
 
         $data['order_desc'] = 'Покупка в ' . $this->config->get('config_name');
 
-        if (isset($this->session->data['guest']['email'])) {
+        if (!empty($order_info['email'])) {
+            $data['email'] = $order_info['email'];
+        } elseif (isset($this->session->data['guest']['email'])) {
             $data['email'] = $this->session->data['guest']['email'];
         } else {
             $data['email'] = '';
