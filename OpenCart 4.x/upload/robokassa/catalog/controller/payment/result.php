@@ -19,7 +19,7 @@ class Result extends \Opencart\System\Engine\Controller {
 
         $crc = strtoupper($crc);
 
-        $my_crc = $this->getSignature($out_summ, $order_id, $password_2);
+        $my_crc = $this->getSignature($out_summ, $order_id, $password_2, $request_data);
 
         if ($my_crc == $crc) {
             $this->load->model('checkout/order');
@@ -27,7 +27,7 @@ class Result extends \Opencart\System\Engine\Controller {
             $order_info = $this->model_checkout_order->getOrder($order_id);
             $new_order_status_id = $this->config->get('payment_robokassa_order_status_id');
 
-            echo 'OK' . $this->request->post["InvId"];
+            echo 'OK' . $order_id;
 
             if ($order_info['order_status_id'] == 0) {
                 $this->model_checkout_order->addHistory($order_id, $new_order_status_id);
@@ -56,9 +56,25 @@ class Result extends \Opencart\System\Engine\Controller {
 
     }
 
-    private function getSignature($out_summ, int $order_id, string $password): string
+    private function getSignature($out_summ, int $order_id, string $password, array $request_data): string
     {
-        return strtoupper(md5($out_summ . ":" . $order_id . ":" . $password . ":Shp_item=1:Shp_label=official_opencart"));
+        $shp = [];
+
+        foreach ($request_data as $key => $value) {
+            if (stripos((string)$key, 'Shp_') === 0 || stripos((string)$key, 'shp_') === 0) {
+                $shp[(string)$key] = (string)$value;
+            }
+        }
+
+        ksort($shp, SORT_STRING);
+
+        $parts = [$out_summ, $order_id, $password];
+
+        foreach ($shp as $key => $value) {
+            $parts[] = $key . '=' . $value;
+        }
+
+        return strtoupper(md5(implode(':', $parts)));
     }
 
     private function clearPersistentCart(int $order_customer_id = 0): void

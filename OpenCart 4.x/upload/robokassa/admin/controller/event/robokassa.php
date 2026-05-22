@@ -5,6 +5,106 @@ class Robokassa extends \Opencart\System\Engine\Controller
 {
     private static array $done = [];
 
+    private function getRobokassaInstallmentAliases(): array
+    {
+        $robokassa_installment_aliases = [];
+        $robokassa_methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
+        $robokassa_current_login = trim((string)$this->config->get('payment_robokassa_login'));
+        $robokassa_saved_login = trim((string)$this->config->get('payment_robokassa_methods_login'));
+        $robokassa_merchant_login = ($robokassa_methods_initialized && $robokassa_current_login !== '' && $robokassa_saved_login === $robokassa_current_login) ? $robokassa_saved_login : '';
+
+        if ($robokassa_merchant_login !== '') {
+            $robokassa_currency_url = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/GetCurrencies?MerchantLogin=' . rawurlencode($robokassa_merchant_login) . '&Language=ru';
+            $robokassa_currency_xml = false;
+
+            if (function_exists('curl_init')) {
+                $robokassa_ch = curl_init($robokassa_currency_url);
+                curl_setopt($robokassa_ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($robokassa_ch, CURLOPT_CONNECTTIMEOUT, 3);
+                curl_setopt($robokassa_ch, CURLOPT_TIMEOUT, 3);
+                $robokassa_currency_xml = curl_exec($robokassa_ch);
+                curl_close($robokassa_ch);
+            }
+
+            if ($robokassa_currency_xml === false && ini_get('allow_url_fopen')) {
+                $robokassa_currency_context = stream_context_create([
+                    'http' => [
+                        'timeout' => 3
+                    ]
+                ]);
+                $robokassa_currency_xml = @file_get_contents($robokassa_currency_url, false, $robokassa_currency_context);
+            }
+
+            if ($robokassa_currency_xml !== false && strpos($robokassa_currency_xml, '<Code>0</Code>') !== false && preg_match_all('/\bAlias="([^"]+)"/i', $robokassa_currency_xml, $robokassa_aliases_match)) {
+                foreach ($robokassa_aliases_match[1] as $robokassa_alias) {
+                    $robokassa_installment_aliases[] = strtolower((string)$robokassa_alias);
+                }
+
+                $robokassa_installment_aliases = array_unique($robokassa_installment_aliases);
+            }
+        }
+
+        return $robokassa_installment_aliases;
+    }
+
+    private function filterRobokassaPaymentList(string $output): string
+    {
+        $robokassa_installment_map = [
+            'robokassa_podeli' => 'podeli',
+            'robokassa_credit' => 'otp',
+            'robokassa_mokka' => 'mokka',
+            'robokassa_sbp' => 'sbp',
+            'robokassa_yandex_split' => 'yandexpaysplit',
+            'robokassa_split' => 'yandexpaysplit'
+        ];
+        $robokassa_bnpl_aliases = ['podeli', 'otp', 'mokka', 'yandexpaysplit'];
+        $robokassa_installment_aliases = $this->getRobokassaInstallmentAliases();
+
+        foreach ($robokassa_installment_map as $robokassa_code => $robokassa_alias) {
+            if (in_array($robokassa_alias, $robokassa_installment_aliases, true)) {
+                continue;
+            }
+
+            $output = $this->removeRobokassaPaymentRow($output, $robokassa_code);
+        }
+
+        if (!array_intersect($robokassa_bnpl_aliases, $robokassa_installment_aliases)) {
+            $output = $this->removeRobokassaPaymentRow($output, 'robokassa_widget');
+        }
+
+        return $output;
+    }
+
+    private function removeRobokassaPaymentRow(string $output, string $code): string
+    {
+        return (string)preg_replace_callback('~<tr\b[\s\S]*?</tr>~i', static function (array $matches) use ($code): string {
+            $row = $matches[0];
+
+            if (strpos($row, 'extension/robokassa/payment/' . $code) !== false) {
+                return '';
+            }
+
+            if (strpos($row, 'code=' . $code) !== false) {
+                return '';
+            }
+
+            if (preg_match('~\b' . preg_quote($code, '~') . '\b~', $row)) {
+                return '';
+            }
+
+            return $row;
+        }, $output);
+    }
+
+    public function onPaymentExtensionViewAfter(&$route, &$args, &$output = null): void
+    {
+        if (!is_string($output) || $output === '') {
+            return;
+        }
+
+        $output = $this->filterRobokassaPaymentList($output);
+    }
+
     private function shouldRun(int $order_id, int $new_status_id): bool
     {
         if ($order_id <= 0) return false;

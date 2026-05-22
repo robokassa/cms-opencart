@@ -1,0 +1,137 @@
+<div class="robokassa-product-widget" id="robokassa-product-widget" data-product-id="{{ product_id }}" data-widget-url="{{ widget_data_url }}" data-checkout-url="{{ checkout_url }}">
+    <div class="robokassa-product-widget__item robokassa-product-widget__item--bnpl">
+        <robokassa-widget
+                outSum="{{ out_sum }}"
+                merchantLogin="{{ merchant_login }}"
+                receipt="{{ receipt }}"
+                signature="{{ signature }}"
+                theme="{{ bnpl_theme }}"
+                size="{{ bnpl_size }}"
+                showLogo="{{ bnpl_show_logo }}"
+                borderRadius="{{ bnpl_border_radius }}"
+                descriptionPosition="{{ bnpl_description_position }}"
+                type="bnpl"
+                email="{{ email }}"
+                hasSecondLine="{{ bnpl_has_second_line }}"
+                mode="checkout"
+                checkoutUrl="{{ checkout_url }}">
+        </robokassa-widget>
+    </div>
+    <div class="robokassa-product-widget__item robokassa-product-widget__item--credit">
+        <robokassa-widget
+                outSum="{{ out_sum }}"
+                merchantLogin="{{ merchant_login }}"
+                receipt="{{ receipt }}"
+                signature="{{ signature }}"
+                theme="{{ credit_theme }}"
+                size="{{ credit_size }}"
+                showLogo="{{ credit_show_logo }}"
+                borderRadius="{{ credit_border_radius }}"
+                descriptionPosition="{{ credit_description_position }}"
+                type="credit"
+                paymentMethod="OTP"
+                email="{{ email }}"
+                hasSecondLine="{{ credit_has_second_line }}"
+                mode="checkout"
+                checkoutUrl="{{ checkout_url }}&payment_method=robokassa_credit">
+        </robokassa-widget>
+    </div>
+</div>
+
+<script src="https://auth.robokassa.ru/merchant/bundle/robokassa-iframe-badge.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var container = document.getElementById('robokassa-product-widget');
+
+    if (!container) {
+        return;
+    }
+
+    var productId = container.getAttribute('data-product-id');
+    var widgetDataUrl = container.getAttribute('data-widget-url');
+    var checkoutUrl = container.getAttribute('data-checkout-url');
+
+    function getQuantityValue() {
+        var input = document.querySelector('#input-quantity, input[name="quantity"], #product input[type="number"]');
+        var quantity = input ? parseInt(input.value, 10) : 1;
+        return quantity > 0 ? quantity : 1;
+    }
+
+    function updateCheckoutUrls() {
+        var quantity = getQuantityValue();
+        var separator = checkoutUrl.indexOf('?') === -1 ? '?' : '&';
+        var bnplUrl = checkoutUrl + separator + 'product_id=' + encodeURIComponent(productId) + '&quantity=' + encodeURIComponent(quantity);
+        var creditUrl = bnplUrl + '&payment_method=' + encodeURIComponent('robokassa_credit');
+        var bnplWidget = container.querySelector('.robokassa-product-widget__item--bnpl robokassa-widget');
+        var creditWidget = container.querySelector('.robokassa-product-widget__item--credit robokassa-widget');
+
+        if (bnplWidget) {
+            bnplWidget.setAttribute('checkoutUrl', bnplUrl);
+        }
+
+        if (creditWidget) {
+            creditWidget.setAttribute('checkoutUrl', creditUrl);
+        }
+    }
+
+    function applyWidgetData(payload) {
+        var widgets = container.querySelectorAll('robokassa-widget');
+
+        for (var i = 0; i < widgets.length; i++) {
+            widgets[i].setAttribute('outSum', payload.out_sum);
+            widgets[i].setAttribute('merchantLogin', payload.merchant_login);
+            widgets[i].setAttribute('receipt', payload.receipt);
+            widgets[i].setAttribute('signature', payload.signature);
+            widgets[i].setAttribute('email', payload.email);
+        }
+
+        container.style.display = payload.show_bnpl || payload.show_credit ? '' : 'none';
+        updateCheckoutUrls();
+    }
+
+    function requestWidgetData() {
+        var separator = widgetDataUrl.indexOf('?') === -1 ? '?' : '&';
+        var xhr = new XMLHttpRequest();
+
+        xhr.open('GET', widgetDataUrl + separator + 'product_id=' + encodeURIComponent(productId) + '&quantity=' + encodeURIComponent(getQuantityValue()), true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== 4 || xhr.status < 200 || xhr.status >= 300) {
+                return;
+            }
+
+            try {
+                var payload = JSON.parse(xhr.responseText);
+
+                if (payload && payload.success) {
+                    applyWidgetData(payload);
+                }
+            } catch (e) {}
+        };
+        xhr.send();
+    }
+
+    updateCheckoutUrls();
+
+    document.addEventListener('input', function (event) {
+        if (event.target && event.target.matches('#input-quantity, input[name="quantity"], #product input[type="number"]')) {
+            updateCheckoutUrls();
+            requestWidgetData();
+        }
+    }, true);
+});
+</script>
+
+<style>
+    .robokassa-product-widget {
+        margin: 15px 0;
+    }
+
+    .robokassa-product-widget__item + .robokassa-product-widget__item {
+        margin-top: 12px;
+    }
+
+    .robokassa-product-widget robokassa-widget {
+        display: block;
+        max-width: 420px;
+    }
+</style>

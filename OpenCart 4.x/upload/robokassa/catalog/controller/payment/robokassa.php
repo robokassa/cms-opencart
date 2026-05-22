@@ -87,6 +87,21 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $data['culture'] = $language;
 
+        $selected_payment_code = $this->getSelectedPaymentCode();
+
+        if ($selected_payment_code === 'robokassa_sbp') {
+            return $this->renderSbpPayment($order_info, $password_1, $data);
+        }
+
+        $inc_curr_labels = [
+            'robokassa_mokka' => 'Mokka',
+            'robokassa_podeli' => 'Podeli',
+            'robokassa_yandex_split' => 'YandexPaySplit',
+            'robokassa_credit' => 'OTP'
+        ];
+
+        $data['inc_curr_label'] = $inc_curr_labels[$selected_payment_code] ?? '';
+
         $order_product['quantity'] =  $this->model_checkout_order->getOrder($order_info['order_id']);
 
         $order_product['price'] = $this->model_checkout_order->getOrder($order_info['order_id']);
@@ -216,6 +231,153 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $this->load->model('extension/robokassa/payment/robokassa');
 
         $this->model_extension_payment_robokassa->sendSecondCheck(82);
+    }
+
+    public function status(): void
+    {
+        $this->load->model('checkout/order');
+
+        $json = ['paid' => false];
+        $order_id = (int)($this->request->get['order_id'] ?? ($this->request->get['amp;order_id'] ?? 0));
+
+        if ($order_id <= 0) {
+            $json['error'] = 'invalid_order';
+        } else {
+            $order_info = $this->model_checkout_order->getOrder($order_id);
+
+            if (!$order_info) {
+                $json['error'] = 'order_not_found';
+            } else {
+                $json['paid'] = $this->isPaidOrderStatus((int)$order_info['order_status_id']);
+                $json['order_status_id'] = (int)$order_info['order_status_id'];
+                $json['success_url'] = html_entity_decode($this->url->link('checkout/success', '', true), ENT_QUOTES, 'UTF-8');
+            }
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json));
+    }
+
+    private function getSelectedPaymentCode(): string
+    {
+        $payment_method = $this->session->data['payment_method'] ?? [];
+
+        if (is_array($payment_method)) {
+            $code = (string)($payment_method['code'] ?? '');
+        } else {
+            $code = (string)$payment_method;
+        }
+
+        if (strpos($code, '.') !== false) {
+            $parts = explode('.', $code);
+            $code = (string)end($parts);
+        }
+
+        return $code;
+    }
+
+    private function renderSbpPayment(array $order_info, string $password_1, array $base_data): string
+    {
+        $receipt = '';
+
+        if ($this->config->get('payment_robokassa_fiscal')) {
+            $items = [];
+            $tax = $this->config->get('payment_robokassa_tax');
+            $payment_method = $this->config->get('payment_robokassa_payment_method');
+            $payment_object = $this->config->get('payment_robokassa_payment_object');
+
+            foreach ($this->cart->getProducts() as $product) {
+                $quantity = (float)$product['quantity'];
+                $items[] = [
+                    'name' => mb_substr(trim(htmlspecialchars($product['name'])), 0, 128, 'UTF-8'),
+                    'sum' => round((float)$product['price'] * $quantity, 2),
+                    'quantity' => ((int)$quantity == $quantity) ? (int)$quantity : $quantity,
+                    'payment_method' => $payment_method,
+                    'payment_object' => $payment_object,
+                    'tax' => $tax
+                ];
+            }
+
+            $receipt = json_encode([
+                'sno' => $this->config->get('payment_robokassa_tax_type'),
+                'items' => $items
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+
+        $out_summ = number_format((float)$this->currency->format($order_info['total'], $order_info['currency_code'], false, false), 2, '.', '');
+        $shp_params = [
+            'Shp_label' => 'official_opencart',
+            'Shp_merchant_id' => $base_data['robokassa_login'],
+            'Shp_order_id' => (string)$base_data['inv_id'],
+            'Shp_result_url' => $this->getCallbackUrl('extension/robokassa/payment/result')
+        ];
+
+        $signature_parts = [
+            $base_data['robokassa_login'],
+            $out_summ,
+            $base_data['inv_id']
+        ];
+
+        if ($receipt !== '') {
+            $signature_parts[] = $receipt;
+        }
+
+        $signature_parts[] = $password_1;
+
+        ksort($shp_params, SORT_STRING);
+
+        foreach ($shp_params as $key => $value) {
+            $signature_parts[] = $key . '=' . $value;
+        }
+
+        $data = [
+            'error_message' => '',
+            'text_qr_label' => 'QR code for payment',
+            'text_qr_caption' => 'Open your banking app and scan the QR code to complete the payment.',
+            'text_qr_wait' => 'Waiting for payment confirmation...',
+            'qr_container_id' => 'robokassa-sbp-qr-' . $base_data['inv_id'],
+            'qr_container_size' => 280,
+            'inv_id' => $base_data['inv_id'],
+            'status_url_js' => json_encode(html_entity_decode($this->url->link('extension/robokassa/payment/robokassa.status', 'order_id=' . $base_data['inv_id'], true), ENT_QUOTES, 'UTF-8')),
+            'success_url_js' => json_encode(html_entity_decode($this->url->link('checkout/success', '', true), ENT_QUOTES, 'UTF-8')),
+            'qr_container_id_js' => json_encode('robokassa-sbp-qr-' . $base_data['inv_id']),
+            'shp_params_js' => json_encode($shp_params),
+            'email_js' => json_encode($base_data['email']),
+            'robokassa_login_js' => json_encode($base_data['robokassa_login']),
+            'out_summ_js' => json_encode($out_summ),
+            'inv_id_js' => json_encode((string)$base_data['inv_id']),
+            'signature_js' => json_encode(md5(implode(':', $signature_parts))),
+            'receipt_js' => $receipt !== '' ? json_encode($receipt) : 'null',
+            'text_qr_wait_js' => json_encode('Waiting for payment confirmation...'),
+            'text_qr_error_js' => json_encode('Failed to load the QR code. Refresh the page and try again.')
+        ];
+
+        return $this->load->view('extension/robokassa/payment/robokassa_sbp', $data);
+    }
+
+    private function isPaidOrderStatus(int $order_status_id): bool
+    {
+        $paid_status_ids = $this->normalizeStatusList($this->config->get('payment_robokassa_order_status_id'));
+        $paid_status_ids = array_merge($paid_status_ids, $this->normalizeStatusList($this->config->get('config_processing_status')));
+        $paid_status_ids = array_merge($paid_status_ids, $this->normalizeStatusList($this->config->get('config_complete_status')));
+
+        return in_array($order_status_id, array_values(array_unique($paid_status_ids)), true);
+    }
+
+    private function normalizeStatusList($value): array
+    {
+        $items = is_array($value) ? $value : (($value === null || $value === '') ? [] : [$value]);
+        $status_ids = [];
+
+        foreach ($items as $item) {
+            $status_id = (int)$item;
+
+            if ($status_id > 0) {
+                $status_ids[] = $status_id;
+            }
+        }
+
+        return $status_ids;
     }
 
     private function getCheckoutRedirectScript(): string

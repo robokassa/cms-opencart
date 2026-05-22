@@ -3,7 +3,7 @@
     <div class="buttons">
         <div class="pull-right">
             <input type="submit" value="{{ button_confirm }}" class="btn btn-primary"
-                   onclick="Robokassa.StartPayment({MerchantLogin: '{{ robokassa_login }}',    OutSum: '{{ out_summ }}', InvId: '{{ inv_id }}', Description: '{{ order_desc }}', Email: '{{ email }}', {% if out_summ_currency %} OutSumCurrency: '{{ out_summ_currency }}', {% endif %} {% if robokassa_fiscal %} Receipt: '{{ receipt }}', {% endif %} {% if robokassa_status_hold %} StepByStep: 'true', ResultUrl2: '{{ result2_url }}', {% endif %} SignatureValue: '{{ crc }}', Shp_item: '1', Shp_label: 'official_opencart', Culture: '{{ culture }}'{% if robokassa_test %}, IsTest: '1' {% endif %}})">
+                   onclick="Robokassa.StartPayment({MerchantLogin: '{{ robokassa_login }}',    OutSum: '{{ out_summ }}', InvId: '{{ inv_id }}', Description: '{{ order_desc }}', Email: '{{ email }}', {% if out_summ_currency %} OutSumCurrency: '{{ out_summ_currency }}', {% endif %} {% if robokassa_fiscal %} Receipt: '{{ receipt }}', {% endif %} {% if inc_curr_label %} IncCurrLabel: '{{ inc_curr_label }}', {% endif %} {% if robokassa_status_hold %} StepByStep: 'true', ResultUrl2: '{{ result2_url }}', {% endif %} SignatureValue: '{{ crc }}', Shp_item: '1', Shp_label: 'official_opencart', Culture: '{{ culture }}'{% if robokassa_test %}, IsTest: '1' {% endif %}})">
         </div>
     </div>
 {% else %}
@@ -31,7 +31,9 @@
         {% if robokassa_test %}
             <input type="hidden" name="IsTest" value="1"/>
         {% endif %}
-        <input type="hidden" name="IncCurrLabel" value=""/>
+        {% if inc_curr_label %}
+            <input type="hidden" name="IncCurrLabel" value="{{ inc_curr_label }}"/>
+        {% endif %}
         <input type="hidden" name="Culture" value="{{ culture }}"/>
         <div class="buttons">
             <div class="pull-right">

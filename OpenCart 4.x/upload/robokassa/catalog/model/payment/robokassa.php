@@ -33,6 +33,113 @@ class Robokassa extends \Opencart\System\Engine\Model {
 
         return $method_data;
     }
+
+    protected function getExtraMethod(array $address, string $code, string $alias, string $title, float $min, float $max, string $status_key, string $sort_order_key): array
+    {
+        if (!$this->config->get('payment_robokassa_status') || $this->config->get('payment_robokassa_country') !== 'RUB') {
+            return [];
+        }
+
+        if (!$this->config->get($status_key) || !$this->hasSyncedAlias($alias)) {
+            return [];
+        }
+
+        $total = $this->getCartTotal();
+
+        if ($total < $min || $total > $max || !$this->matchesGeoZone($address)) {
+            return [];
+        }
+
+        if (in_array($code, ['robokassa_mokka', 'robokassa_podeli', 'robokassa_yandex_split'], true)) {
+            $graph_method = $this->getGraphPaymentMethod($code);
+            $title .= '<div class="robokassa-checkout-graph" data-payment-method="' . $this->db->escape($graph_method) . '"><robokassa-graph merchantLogin="' . $this->db->escape((string)$this->config->get('payment_robokassa_login')) . '" outSum="' . number_format($total, 2, '.', '') . '" paymentMethod="' . $this->db->escape($graph_method) . '"></robokassa-graph></div>';
+        }
+
+        return [
+            'code'       => $code,
+            'title'      => $title,
+            'name'       => $title,
+            'sort_order' => $this->config->get($sort_order_key)
+        ];
+    }
+
+    protected function getExtraMethods(array $address, string $code, string $alias, string $title, float $min, float $max, string $status_key, string $sort_order_key): array
+    {
+        $method = $this->getExtraMethod($address, $code, $alias, $title, $min, $max, $status_key, $sort_order_key);
+
+        if (!$method) {
+            return [];
+        }
+
+        if (!empty($this->session->data['robokassa_widget_payment_code']) && (string)$this->session->data['robokassa_widget_payment_code'] === $code) {
+            $this->session->data['payment_method'] = [
+                'code' => $code . '.' . $code,
+                'name' => $method['name']
+            ];
+
+            unset($this->session->data['robokassa_widget_payment_code']);
+        }
+
+        return [
+            'code'       => $code,
+            'option'     => [
+                $code => [
+                    'code' => $code . '.' . $code,
+                    'name' => $method['name']
+                ]
+            ],
+            'name'       => $method['name'],
+            'sort_order' => $method['sort_order']
+        ];
+    }
+
+    protected function getGraphPaymentMethod(string $code): string
+    {
+        $map = [
+            'robokassa_mokka' => 'Mokka',
+            'robokassa_podeli' => 'Podeli',
+            'robokassa_yandex_split' => 'YandexPaySplit'
+        ];
+
+        return $map[$code] ?? '';
+    }
+
+    protected function hasSyncedAlias(string $alias): bool
+    {
+        $aliases = $this->config->get('payment_robokassa_methods_aliases');
+
+        if (!is_array($aliases)) {
+            return false;
+        }
+
+        return in_array(strtolower($alias), array_map('strtolower', $aliases), true);
+    }
+
+    protected function getCartTotal(): float
+    {
+        if (method_exists($this->cart, 'getTotal')) {
+            return (float)$this->cart->getTotal();
+        }
+
+        return (float)$this->cart->getSubTotal();
+    }
+
+    protected function matchesGeoZone(array $address): bool
+    {
+        $geo_zone_id = (int)$this->config->get('payment_robokassa_geo_zone_id');
+
+        if (!$geo_zone_id) {
+            return true;
+        }
+
+        if (empty($address['country_id'])) {
+            return false;
+        }
+
+        $query = $this->db->query("SELECT * FROM `" . DB_PREFIX . "zone_to_geo_zone` WHERE geo_zone_id = '" . $geo_zone_id . "' AND country_id = '" . (int)$address['country_id'] . "' AND (zone_id = '" . (int)($address['zone_id'] ?? 0) . "' OR zone_id = '0')");
+
+        return (bool)$query->num_rows;
+    }
 	
     protected static function formatSignReplace($string)
     {
