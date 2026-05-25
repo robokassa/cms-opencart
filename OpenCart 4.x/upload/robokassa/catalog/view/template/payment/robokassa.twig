@@ -1,4 +1,12 @@
-{% if robokassa_status_iframe %}
+{% if inc_curr_label %}
+    <script type="text/javascript" src="https://auth.robokassa.ru/Merchant/PaymentForm/DirectPayment.js"></script>
+    <div class="buttons">
+        <div class="pull-right">
+            <input type="button" value="{{ button_confirm }}" class="btn btn-primary"
+                   onclick="Robo.directPayment.startOp({MerchantLogin: '{{ robokassa_login }}', OutSum: '{{ out_summ }}', InvId: '{{ inv_id }}', Description: '{{ order_desc }}', Email: '{{ email }}', {% if out_summ_currency %}OutSumCurrency: '{{ out_summ_currency }}', {% endif %}{% if robokassa_fiscal %}Receipt: '{{ receipt }}', {% endif %}IncCurrLabel: '{{ inc_curr_label }}', SignatureValue: '{{ crc }}', Shp_item: '1', Shp_label: 'official_opencart', Culture: '{{ culture }}'{% if robokassa_test %}, IsTest: '1' {% endif %}})">
+        </div>
+    </div>
+{% elseif robokassa_status_iframe %}
     <script type="text/javascript" src="{{ iframeUrl }}"></script>
     <div class="buttons">
         <div class="pull-right">

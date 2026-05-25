@@ -8,6 +8,13 @@ class RobokassaWidget extends \Opencart\System\Engine\Controller
         return !empty($this->request->server['HTTPS']) && strtolower((string)$this->request->server['HTTPS']) !== 'off';
     }
 
+    private function getActionRoute(string $method): string
+    {
+        $separator = defined('VERSION') && version_compare(VERSION, '4.0.2.0', '>=') ? '.' : '|';
+
+        return 'extension/robokassa/payment/robokassa_widget' . $separator . $method;
+    }
+
     private function getPassword1(): string
     {
         return (string)($this->config->get('payment_robokassa_test') ? $this->config->get('payment_robokassa_test_password_1') : $this->config->get('payment_robokassa_password_1'));
@@ -20,6 +27,60 @@ class RobokassaWidget extends \Opencart\System\Engine\Controller
         }
 
         return trim((string)$this->config->get('config_email')) ?: 'test@test.ru';
+    }
+
+    private function normalizePaymentCode(string $value): string
+    {
+        $value = strtolower(preg_replace('/[^a-z0-9]+/', '', $value));
+
+        if (strpos($value, 'otp') !== false || strpos($value, 'credit') !== false) {
+            return 'robokassa_credit';
+        }
+
+        if (strpos($value, 'podeli') !== false) {
+            return 'robokassa_podeli';
+        }
+
+        if (strpos($value, 'mokka') !== false) {
+            return 'robokassa_mokka';
+        }
+
+        if (strpos($value, 'yandex') !== false || strpos($value, 'split') !== false) {
+            return 'robokassa_yandex_split';
+        }
+
+        return '';
+    }
+
+    private function resolveSelectedPaymentCode(): string
+    {
+        foreach (['payment_method', 'paymentMethod', 'method', 'currLabel', 'label', 'alias', 'incCurrLabel', 'type'] as $key) {
+            if (!empty($this->request->post[$key])) {
+                $code = $this->normalizePaymentCode((string)$this->request->post[$key]);
+
+                if ($code !== '') {
+                    return $code;
+                }
+            }
+        }
+
+        if (!empty($this->request->post['widget_payload'])) {
+            $payload = json_decode((string)$this->request->post['widget_payload'], true);
+
+            if (is_array($payload)) {
+                foreach (['payment_method', 'paymentMethod', 'method', 'currLabel', 'label', 'alias', 'incCurrLabel', 'type'] as $key) {
+                    if (!empty($payload[$key])) {
+                        $code = $this->normalizePaymentCode((string)$payload[$key]);
+
+                        if ($code !== '') {
+                            return $code;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $this->normalizePaymentCode((string)($this->request->get['payment_method'] ?? ''));
     }
 
     private function buildWidgetData(int $product_id, int $quantity): array
@@ -66,7 +127,9 @@ class RobokassaWidget extends \Opencart\System\Engine\Controller
             'out_sum' => $out_sum,
             'receipt' => $receipt,
             'signature' => md5($merchant_login . ':' . $out_sum . '::' . $receipt . ':' . $password_1),
-            'email' => $this->getCustomerEmail()
+            'email' => $this->getCustomerEmail(),
+            'show_bnpl' => true,
+            'show_credit' => true
         ];
     }
 
@@ -90,8 +153,8 @@ class RobokassaWidget extends \Opencart\System\Engine\Controller
             'receipt' => $widget_data['receipt'],
             'signature' => $widget_data['signature'],
             'email' => $widget_data['email'],
-            'show_bnpl' => true,
-            'show_credit' => true
+            'show_bnpl' => $widget_data['show_bnpl'],
+            'show_credit' => $widget_data['show_credit']
         ]));
     }
 
@@ -99,10 +162,14 @@ class RobokassaWidget extends \Opencart\System\Engine\Controller
     {
         $product_id = (int)($this->request->post['product_id'] ?? ($this->request->get['product_id'] ?? 0));
         $quantity = max(1, (int)($this->request->post['quantity'] ?? ($this->request->get['quantity'] ?? 1)));
-        $payment_method = (string)($this->request->post['payment_method'] ?? ($this->request->get['payment_method'] ?? ''));
+        $payment_method = $this->resolveSelectedPaymentCode();
 
         if ($product_id > 0) {
-            $this->cart->add($product_id, $quantity);
+            $option = $this->request->post['option'] ?? [];
+            $option = is_array($option) ? $option : [];
+            $subscription_plan_id = (int)($this->request->post['subscription_plan_id'] ?? 0);
+
+            $this->cart->add($product_id, $quantity, $option, $subscription_plan_id);
             unset($this->session->data['shipping_method'], $this->session->data['shipping_methods'], $this->session->data['payment_method'], $this->session->data['payment_methods']);
         }
 
@@ -124,8 +191,8 @@ class RobokassaWidget extends \Opencart\System\Engine\Controller
         }
 
         $data = $widget_data;
-        $data['widget_data_url'] = html_entity_decode($this->url->link('extension/robokassa/payment/robokassa_widget.data', '', $this->isSecureRequest()), ENT_QUOTES, 'UTF-8');
-        $data['checkout_url'] = html_entity_decode($this->url->link('extension/robokassa/payment/robokassa_widget.checkout', 'product_id=' . $product_id, $this->isSecureRequest()), ENT_QUOTES, 'UTF-8');
+        $data['widget_data_url'] = html_entity_decode($this->url->link($this->getActionRoute('data'), '', $this->isSecureRequest()), ENT_QUOTES, 'UTF-8');
+        $data['checkout_url'] = html_entity_decode($this->url->link($this->getActionRoute('checkout'), '', $this->isSecureRequest()), ENT_QUOTES, 'UTF-8');
 
         foreach ([
             'bnpl_theme' => 'payment_robokassa_widget_bnpl_theme',

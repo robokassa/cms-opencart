@@ -34,4 +34,80 @@ class RobokassaWidget extends RobokassaSbp
 
         return $data;
     }
+
+    protected function saveSettingDirect(string $code, array $data, int $store_id = 0): void
+    {
+        parent::saveSettingDirect($code, $data, $store_id);
+        $this->registerProductWidgetEvents();
+    }
+
+    public function install(): void
+    {
+        $this->registerProductWidgetEvents();
+    }
+
+    public function uninstall(): void
+    {
+        $this->load->model('setting/event');
+
+        foreach ([
+            'robokassa_product_widget_after_dot',
+            'robokassa_product_widget_after_pipe',
+            'robokassa_widget_payment_method_after_dot',
+            'robokassa_widget_payment_method_after_pipe'
+        ] as $code) {
+            $this->model_setting_event->deleteEventByCode($code);
+        }
+    }
+
+    private function registerProductWidgetEvents(): void
+    {
+        $this->load->model('setting/event');
+
+        foreach ([
+            'robokassa_product_widget_after_dot',
+            'robokassa_product_widget_after_pipe',
+            'robokassa_widget_payment_method_after_dot',
+            'robokassa_widget_payment_method_after_pipe'
+        ] as $code) {
+            $this->model_setting_event->deleteEventByCode($code);
+        }
+
+        foreach ([
+            [
+                'code' => 'robokassa_product_widget_after_dot',
+                'description' => 'Robokassa product widget (product/product after, dot)',
+                'trigger' => 'catalog/view/product/product/after',
+                'action' => 'extension/robokassa/event/robokassa.onProductViewAfter',
+                'status' => 1,
+                'sort_order' => 4
+            ],
+            [
+                'code' => 'robokassa_product_widget_after_pipe',
+                'description' => 'Robokassa product widget (product/product after, pipe)',
+                'trigger' => 'catalog/view/product/product/after',
+                'action' => 'extension/robokassa/event/robokassa|onProductViewAfter',
+                'status' => 1,
+                'sort_order' => 5
+            ],
+            [
+                'code' => 'robokassa_widget_payment_method_after_dot',
+                'description' => 'Robokassa product widget payment preselect (dot)',
+                'trigger' => 'catalog/view/checkout/payment_method/after',
+                'action' => 'extension/robokassa/event/robokassa.onPaymentMethodViewAfter',
+                'status' => 1,
+                'sort_order' => 6
+            ],
+            [
+                'code' => 'robokassa_widget_payment_method_after_pipe',
+                'description' => 'Robokassa product widget payment preselect (pipe)',
+                'trigger' => 'catalog/view/checkout/payment_method/after',
+                'action' => 'extension/robokassa/event/robokassa|onPaymentMethodViewAfter',
+                'status' => 1,
+                'sort_order' => 7
+            ]
+        ] as $event) {
+            $this->model_setting_event->addEvent($event);
+        }
+    }
 }

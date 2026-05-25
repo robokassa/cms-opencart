@@ -55,12 +55,22 @@ class Robokassa extends \Opencart\System\Engine\Model {
             $title .= '<div class="robokassa-checkout-graph" data-payment-method="' . $this->db->escape($graph_method) . '"><robokassa-graph merchantLogin="' . $this->db->escape((string)$this->config->get('payment_robokassa_login')) . '" outSum="' . number_format($total, 2, '.', '') . '" paymentMethod="' . $this->db->escape($graph_method) . '"></robokassa-graph></div>';
         }
 
-        return [
+        $method = [
             'code'       => $code,
             'title'      => $title,
             'name'       => $title,
             'sort_order' => $this->config->get($sort_order_key)
         ];
+
+        if (defined('VERSION')
+            && version_compare(VERSION, '4.0.2.0', '<')
+            && !empty($this->session->data['robokassa_widget_payment_code'])
+            && (string)$this->session->data['robokassa_widget_payment_code'] === $code) {
+            $this->session->data['payment_method'] = $code;
+            unset($this->session->data['robokassa_widget_payment_code']);
+        }
+
+        return $method;
     }
 
     protected function getExtraMethods(array $address, string $code, string $alias, string $title, float $min, float $max, string $status_key, string $sort_order_key): array

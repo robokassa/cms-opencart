@@ -1,4 +1,5 @@
 <div class="robokassa-product-widget" id="robokassa-product-widget" data-product-id="{{ product_id }}" data-widget-url="{{ widget_data_url }}" data-checkout-url="{{ checkout_url }}">
+    {% if show_bnpl %}
     <div class="robokassa-product-widget__item robokassa-product-widget__item--bnpl">
         <robokassa-widget
                 outSum="{{ out_sum }}"
@@ -14,9 +15,12 @@
                 email="{{ email }}"
                 hasSecondLine="{{ bnpl_has_second_line }}"
                 mode="checkout"
-                checkoutUrl="{{ checkout_url }}">
+                checkoutUrl="{{ checkout_url }}"
+                oncheckout="robokassaProductWidgetCheckoutBnpl">
         </robokassa-widget>
     </div>
+    {% endif %}
+    {% if show_credit %}
     <div class="robokassa-product-widget__item robokassa-product-widget__item--credit">
         <robokassa-widget
                 outSum="{{ out_sum }}"
@@ -33,13 +37,27 @@
                 email="{{ email }}"
                 hasSecondLine="{{ credit_has_second_line }}"
                 mode="checkout"
-                checkoutUrl="{{ checkout_url }}&payment_method=robokassa_credit">
+                checkoutUrl="{{ checkout_url }}&payment_method=robokassa_credit"
+                oncheckout="robokassaProductWidgetCheckoutCredit">
         </robokassa-widget>
     </div>
+    {% endif %}
 </div>
 
 <script src="https://auth.robokassa.ru/merchant/bundle/robokassa-iframe-badge.js"></script>
 <script>
+window.robokassaProductWidgetCheckoutBnpl = function (payload) {
+    return typeof window.robokassaProductWidgetSubmitCheckout === 'function'
+        ? window.robokassaProductWidgetSubmitCheckout(payload, 'bnpl')
+        : true;
+};
+
+window.robokassaProductWidgetCheckoutCredit = function (payload) {
+    return typeof window.robokassaProductWidgetSubmitCheckout === 'function'
+        ? window.robokassaProductWidgetSubmitCheckout(payload, 'credit')
+        : true;
+};
+
 document.addEventListener('DOMContentLoaded', function () {
     var container = document.getElementById('robokassa-product-widget');
 
@@ -50,11 +68,149 @@ document.addEventListener('DOMContentLoaded', function () {
     var productId = container.getAttribute('data-product-id');
     var widgetDataUrl = container.getAttribute('data-widget-url');
     var checkoutUrl = container.getAttribute('data-checkout-url');
+    var productForm = document.getElementById('product') || document.getElementById('form-product');
 
     function getQuantityValue() {
         var input = document.querySelector('#input-quantity, input[name="quantity"], #product input[type="number"]');
         var quantity = input ? parseInt(input.value, 10) : 1;
         return quantity > 0 ? quantity : 1;
+    }
+
+    function normalizePaymentMethod(value, fallbackType) {
+        var normalized = String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+        if (!normalized && fallbackType === 'credit') {
+            return 'robokassa_credit';
+        }
+
+        if (normalized.indexOf('otp') !== -1 || normalized.indexOf('credit') !== -1) {
+            return 'robokassa_credit';
+        }
+
+        if (normalized.indexOf('podeli') !== -1) {
+            return 'robokassa_podeli';
+        }
+
+        if (normalized.indexOf('mokka') !== -1) {
+            return 'robokassa_mokka';
+        }
+
+        if (normalized.indexOf('yandex') !== -1 || normalized.indexOf('split') !== -1) {
+            return 'robokassa_yandex_split';
+        }
+
+        return '';
+    }
+
+    function extractPaymentMethod(payload, fallbackType) {
+        if (!payload) {
+            return normalizePaymentMethod('', fallbackType);
+        }
+
+        if (payload.detail) {
+            return extractPaymentMethod(payload.detail, fallbackType);
+        }
+
+        if (typeof payload === 'string') {
+            return normalizePaymentMethod(payload, fallbackType);
+        }
+
+        if (Object.prototype.toString.call(payload) === '[object Array]') {
+            for (var itemIndex = 0; itemIndex < payload.length; itemIndex++) {
+                var itemMethod = extractPaymentMethod(payload[itemIndex], fallbackType);
+
+                if (itemMethod) {
+                    return itemMethod;
+                }
+            }
+
+            return normalizePaymentMethod('', fallbackType);
+        }
+
+        var keys = ['paymentMethod', 'payment_method', 'method', 'currLabel', 'label', 'alias', 'incCurrLabel', 'type'];
+
+        for (var i = 0; i < keys.length; i++) {
+            if (payload[keys[i]]) {
+                var method = normalizePaymentMethod(payload[keys[i]], fallbackType);
+
+                if (method) {
+                    return method;
+                }
+            }
+        }
+
+        for (var key in payload) {
+            if (Object.prototype.hasOwnProperty.call(payload, key) && payload[key] && typeof payload[key] === 'object') {
+                var nestedMethod = extractPaymentMethod(payload[key], fallbackType);
+
+                if (nestedMethod) {
+                    return nestedMethod;
+                }
+            }
+        }
+
+        return normalizePaymentMethod('', fallbackType);
+    }
+
+    function appendField(form, name, value) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+    }
+
+    function appendProductOptions(form) {
+        if (!productForm) {
+            return;
+        }
+
+        var fields = productForm.querySelectorAll('input[name^="option["], select[name^="option["], textarea[name^="option["], input[name="subscription_plan_id"], select[name="subscription_plan_id"]');
+
+        for (var i = 0; i < fields.length; i++) {
+            var field = fields[i];
+
+            if ((field.type === 'checkbox' || field.type === 'radio') && !field.checked) {
+                continue;
+            }
+
+            appendField(form, field.name, field.value);
+        }
+    }
+
+    function submitCheckout(payload, fallbackType) {
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = checkoutUrl;
+        form.style.display = 'none';
+
+        appendField(form, 'product_id', productId);
+        appendField(form, 'quantity', getQuantityValue());
+        appendField(form, 'payment_method', extractPaymentMethod(payload, fallbackType));
+        appendField(form, 'widget_payload', JSON.stringify(payload || {}));
+        appendProductOptions(form);
+
+        document.body.appendChild(form);
+        form.submit();
+
+        return false;
+    }
+
+    function bindWidgetHandlers() {
+        var bnplWidget = container.querySelector('.robokassa-product-widget__item--bnpl robokassa-widget');
+        var creditWidget = container.querySelector('.robokassa-product-widget__item--credit robokassa-widget');
+
+        if (bnplWidget) {
+            bnplWidget.oncheckout = function (payload) {
+                return submitCheckout(payload, 'bnpl');
+            };
+        }
+
+        if (creditWidget) {
+            creditWidget.oncheckout = function (payload) {
+                return submitCheckout(payload, 'credit');
+            };
+        }
     }
 
     function updateCheckoutUrls() {
@@ -86,6 +242,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         container.style.display = payload.show_bnpl || payload.show_credit ? '' : 'none';
+        bindWidgetHandlers();
         updateCheckoutUrls();
     }
 
@@ -110,7 +267,13 @@ document.addEventListener('DOMContentLoaded', function () {
         xhr.send();
     }
 
+    window.robokassaProductWidgetSubmitCheckout = submitCheckout;
+    bindWidgetHandlers();
     updateCheckoutUrls();
+
+    if (typeof window.initRobokassaBadges === 'function') {
+        window.initRobokassaBadges();
+    }
 
     document.addEventListener('input', function (event) {
         if (event.target && event.target.matches('#input-quantity, input[name="quantity"], #product input[type="number"]')) {

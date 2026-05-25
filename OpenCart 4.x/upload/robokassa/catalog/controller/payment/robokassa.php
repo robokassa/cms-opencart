@@ -106,6 +106,8 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $order_product['price'] = $this->model_checkout_order->getOrder($order_info['order_id']);
 
+        $use_hold = !empty($data['robokassa_status_hold']) && empty($data['inc_curr_label']);
+
         if ($this->config->get('payment_robokassa_fiscal')) {
 
             $tax_type = $this->config->get('payment_robokassa_tax_type');
@@ -118,15 +120,15 @@ class Robokassa extends \Opencart\System\Engine\Controller
             $items = [];
 
             $discount = 0;
-            foreach ($this->model_checkout_order->getTotals($order_info['order_id']) as $row) {
+            $order_totals = $this->model_checkout_order->getTotals($order_info['order_id']);
+
+            foreach ($order_totals as $row) {
                 if ($row['value'] < 0) {
                     $discount = abs($row['value']);
                 }
             };
 
             $total_price = 0;
-            $order_products = $this->model_checkout_order->getOrder($order_info['order_id']);
-
             foreach ($this->cart->getProducts() as $order_product) {
                 $total_price += $order_product['price'] * $order_product['quantity'];
             }
@@ -134,7 +136,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
             $discount_percent = ($discount / $total_price)  ; // процент скидки на каждый товар
 
             foreach ($this->cart->getProducts() as $order_product) {
-                $item_price = $order_product['price'] / $order_product['quantity'] ;
+                $item_price = (float)$order_product['price'];
 
                 // вычисляем стоимость скидки для каждого товара
                 $item_discount = round($item_price * $discount_percent, 2);
@@ -151,8 +153,30 @@ class Robokassa extends \Opencart\System\Engine\Controller
                 ];
             }
 
+            $shipping_added = false;
 
-            if (isset($this->session->data['shipping_method']) && is_array($this->session->data['shipping_method'])) {
+            foreach ($order_totals as $row) {
+                if (($row['code'] ?? '') !== 'shipping' || (float)$row['value'] <= 0) {
+                    continue;
+                }
+
+                $items[] = [
+                    'name' => mb_substr(trim(htmlspecialchars((string)$row['title'])), 0, 128, 'UTF-8'),
+                    'cost' => round((float)$row['value'], 2),
+                    'quantity' => 1,
+                    'tax' => $tax,
+                    'payment_method' => $payment_method,
+                    'payment_object' => $payment_object
+                ];
+
+                $shipping_added = true;
+
+                break;
+            }
+
+            if ($shipping_added) {
+                // Delivery is already included from saved order totals.
+            } elseif (isset($this->session->data['shipping_method']) && is_array($this->session->data['shipping_method'])) {
                 $shipping = $this->session->data['shipping_method'];
 
                 if (isset($shipping['name'], $shipping['cost'])) {
@@ -189,15 +213,15 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
             if (isset($data['out_summ_currency'])) {
                 
-				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $data['receipt'] . ":" . ($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
+				$data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . $data['receipt'] . ":" . ($use_hold ? "true:" . urldecode($data['result2_url']) . ":" : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
             } else {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['receipt'] . ":" . ($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) . ":" : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
+                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['receipt'] . ":" . ($use_hold ? "true:" . urldecode($data['result2_url']) . ":" : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart");
             }
         } else {
             if (isset($data['out_summ_currency'])) {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . (($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
+                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . $data['out_summ_currency'] . ":" . (($use_hold ? "true:" . urldecode($data['result2_url']) . ":" : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
             } else {
-                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . (($data['robokassa_status_hold'] == 1 ? "true:" . urldecode($data['result2_url']) . ":" : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
+                $data['crc'] = md5($data['robokassa_login'] . ":" . $data['out_summ'] . ":" . $data['inv_id'] . ":" . (($use_hold ? "true:" . urldecode($data['result2_url']) . ":" : "") . $password_1 . ":Shp_item=1" . ":Shp_label=official_opencart"));
             }
         }
 
@@ -296,6 +320,23 @@ class Robokassa extends \Opencart\System\Engine\Controller
                     'payment_object' => $payment_object,
                     'tax' => $tax
                 ];
+            }
+
+            foreach ($this->model_checkout_order->getTotals($order_info['order_id']) as $row) {
+                if (($row['code'] ?? '') !== 'shipping' || (float)$row['value'] <= 0) {
+                    continue;
+                }
+
+                $items[] = [
+                    'name' => mb_substr(trim(htmlspecialchars((string)$row['title'])), 0, 128, 'UTF-8'),
+                    'sum' => round((float)$row['value'], 2),
+                    'quantity' => 1,
+                    'payment_method' => $payment_method,
+                    'payment_object' => $payment_object,
+                    'tax' => $tax
+                ];
+
+                break;
             }
 
             $receipt = json_encode([

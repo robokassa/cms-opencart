@@ -5,12 +5,11 @@ class Robokassa extends \Opencart\System\Engine\Controller
 {
     public function onProductViewAfter(string &$route, array &$args, mixed &$output): void
     {
-        if (!is_string($output) || strpos($output, '<div id="product">') === false) {
+        if (!is_string($output) || strpos($output, 'id="robokassa-product-widget"') !== false) {
             return;
         }
 
-        $data = $args[1] ?? [];
-        $product_id = (int)($data['product_id'] ?? ($this->request->get['product_id'] ?? 0));
+        $product_id = (int)($this->request->get['product_id'] ?? 0);
 
         if ($product_id <= 0) {
             return;
@@ -21,14 +20,33 @@ class Robokassa extends \Opencart\System\Engine\Controller
             'quantity' => isset($this->request->get['quantity']) ? (int)$this->request->get['quantity'] : 1
         ]);
 
-        if ($widget) {
-            $output = str_replace('<div id="product">', $widget . '<div id="product">', $output);
+        if (!$widget) {
+            return;
+        }
+
+        foreach (['<div id="product">', '<form id="form-product"', '<div id="product-info"'] as $marker) {
+            if (strpos($output, $marker) !== false) {
+                $output = str_replace($marker, $widget . $marker, $output);
+
+                return;
+            }
         }
     }
 
     public function onPaymentMethodViewAfter(string &$route, array &$args, mixed &$output): void
     {
-        if (!is_string($output) || strpos($output, 'robokassa') === false) {
+        if (!is_string($output)) {
+            return;
+        }
+
+        $preferred_code = (string)($this->session->data['robokassa_widget_payment_code'] ?? '');
+
+        if ($preferred_code !== '' && strpos($output, 'robokassa-widget-payment-preselect') === false) {
+            $preferred_json = json_encode($preferred_code);
+            $output .= '<script id="robokassa-widget-payment-preselect" type="text/javascript">(function(){var preferred=' . $preferred_json . ';function choose(){var input=document.getElementById("input-payment-method");if(!input||!preferred){return false;}var option=input.querySelector("option[value=\"" + preferred + "\"]");if(!option){return false;}if(input.value!==preferred){input.value=preferred;if(window.jQuery){window.jQuery(input).trigger("change");}else{input.dispatchEvent(new Event("change",{bubbles:true}));}}return true;}if(window.jQuery){window.jQuery(document).ajaxComplete(function(event,xhr,settings){if(settings&&settings.url&&settings.url.indexOf("checkout/payment_method|getMethods")!==-1){setTimeout(choose,0);}});}setTimeout(choose,0);})();</script>';
+        }
+
+        if (strpos($output, 'robokassa') === false) {
             return;
         }
 
