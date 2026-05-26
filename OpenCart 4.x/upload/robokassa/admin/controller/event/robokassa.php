@@ -105,7 +105,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $output = $this->filterRobokassaPaymentList($output);
     }
 
-    private function shouldRun(int $order_id, int $new_status_id): bool
+    private function shouldRunHold(int $order_id, int $new_status_id): bool
     {
         if ($order_id <= 0) return false;
         if ($new_status_id !== 7 && $new_status_id !== 2) return false;
@@ -129,15 +129,51 @@ class Robokassa extends \Opencart\System\Engine\Controller
         return true;
     }
 
+    private function shouldSendSecondCheck(int $order_id, int $new_status_id): bool
+    {
+        $second_check_status_id = (int)$this->config->get('payment_robokassa_order_status_id_2check');
+
+        if ($order_id <= 0 || $second_check_status_id <= 0 || $new_status_id !== $second_check_status_id) {
+            return false;
+        }
+
+        if (!(int)$this->config->get('payment_robokassa_fiscal')) {
+            return false;
+        }
+
+        $query = $this->db->query(
+            "SELECT order_status_id, payment_method
+             FROM `" . DB_PREFIX . "order`
+             WHERE order_id = '" . (int)$order_id . "'
+             LIMIT 1"
+        );
+
+        if (!$query->num_rows) {
+            return false;
+        }
+
+        return (int)$query->row['order_status_id'] !== $new_status_id
+            && stripos((string)$query->row['payment_method'], 'robokassa') !== false;
+    }
+
     private function runOnce(int $order_id, int $new_status_id): void
     {
         $key = $order_id . ':' . $new_status_id;
         if (isset(self::$done[$key])) return;
         self::$done[$key] = true;
 
-        if (!$this->shouldRun($order_id, $new_status_id)) return;
+        $send_second_check = $this->shouldSendSecondCheck($order_id, $new_status_id);
+        $run_hold = $this->shouldRunHold($order_id, $new_status_id);
+
+        if (!$send_second_check && !$run_hold) return;
 
         $this->load->model('extension/robokassa/payment/robokassa');
+
+        if ($send_second_check) {
+            $this->model_extension_robokassa_payment_robokassa->sendSecondCheck($order_id);
+        }
+
+        if (!$run_hold) return;
 
         if ($new_status_id === 7) {
             $this->model_extension_robokassa_payment_robokassa->holdCancel($order_id);
@@ -166,7 +202,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
     public function onOrderCall(&$route, &$args, &$output = null): void
     {
         $action = (string)($this->request->get['action'] ?? ($this->request->post['action'] ?? ''));
-        if ($action !== 'sale/order.addHistory') return;
+        if (!in_array($action, ['sale/order.addHistory', 'sale/order|addHistory'], true)) return;
 
         $order_id = (int)($this->request->get['order_id'] ?? ($this->request->post['order_id'] ?? 0));
 
@@ -179,7 +215,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $this->runOnce($order_id, $new_status_id);
 
-        if ($this->shouldRun($order_id, $new_status_id)) {
+        if ($this->shouldRunHold($order_id, $new_status_id)) {
             $cur = (string)($this->request->post['comment'] ?? '');
             $this->request->post['comment'] = $this->injectMessage($new_status_id, $cur);
         }
@@ -192,7 +228,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $this->runOnce($order_id, $new_status_id);
 
-        if (!$this->shouldRun($order_id, $new_status_id)) return;
+        if (!$this->shouldRunHold($order_id, $new_status_id)) return;
 
         $cur = isset($args[2]) ? (string)$args[2] : '';
         $args[2] = $this->injectMessage($new_status_id, $cur);

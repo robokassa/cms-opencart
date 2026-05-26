@@ -3,10 +3,9 @@ namespace Opencart\Catalog\Controller\Extension\Robokassa\Payment;
 class Robokassa extends \Opencart\System\Engine\Controller
 {
     public function index() : string {
+        $this->load->language('extension/robokassa/payment/robokassa');
 
         $data['button_confirm'] = $this->language->get('button_confirm');
-
-        $this->load->language('extension/robokassa/payment/robokassa');
 
         $this->load->model('checkout/order');
 
@@ -90,6 +89,8 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $selected_payment_code = $this->getSelectedPaymentCode();
 
         if ($selected_payment_code === 'robokassa_sbp') {
+            $this->load->language('extension/robokassa/payment/robokassa_sbp');
+
             return $this->renderSbpPayment($order_info, $password_1, $data);
         }
 
@@ -373,13 +374,13 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $data = [
             'error_message' => '',
-            'text_qr_label' => 'QR code for payment',
-            'text_qr_caption' => 'Open your banking app and scan the QR code to complete the payment.',
-            'text_qr_wait' => 'Waiting for payment confirmation...',
+            'text_qr_label' => $this->language->get('text_qr_label'),
+            'text_qr_caption' => $this->language->get('text_qr_caption'),
+            'text_qr_wait' => $this->language->get('text_qr_wait'),
             'qr_container_id' => 'robokassa-sbp-qr-' . $base_data['inv_id'],
             'qr_container_size' => 280,
             'inv_id' => $base_data['inv_id'],
-            'status_url_js' => json_encode(html_entity_decode($this->url->link('extension/robokassa/payment/robokassa.status', 'order_id=' . $base_data['inv_id'], true), ENT_QUOTES, 'UTF-8')),
+            'status_url_js' => json_encode(html_entity_decode($this->url->link('extension/robokassa/payment/robokassa|status', 'order_id=' . $base_data['inv_id'], true), ENT_QUOTES, 'UTF-8')),
             'success_url_js' => json_encode(html_entity_decode($this->url->link('checkout/success', '', true), ENT_QUOTES, 'UTF-8')),
             'qr_container_id_js' => json_encode('robokassa-sbp-qr-' . $base_data['inv_id']),
             'shp_params_js' => json_encode($shp_params),
@@ -389,8 +390,8 @@ class Robokassa extends \Opencart\System\Engine\Controller
             'inv_id_js' => json_encode((string)$base_data['inv_id']),
             'signature_js' => json_encode(md5(implode(':', $signature_parts))),
             'receipt_js' => $receipt !== '' ? json_encode($receipt) : 'null',
-            'text_qr_wait_js' => json_encode('Waiting for payment confirmation...'),
-            'text_qr_error_js' => json_encode('Failed to load the QR code. Refresh the page and try again.')
+            'text_qr_wait_js' => json_encode($this->language->get('text_qr_wait')),
+            'text_qr_error_js' => json_encode($this->language->get('text_qr_error'))
         ];
 
         return $this->load->view('extension/robokassa/payment/robokassa_sbp', $data);
