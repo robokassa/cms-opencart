@@ -83,9 +83,25 @@ class RobokassaWidget extends \Opencart\System\Engine\Controller
         return $this->normalizePaymentCode((string)($this->request->get['payment_method'] ?? ''));
     }
 
+    private function hasEnabledInstallmentPaymentMethod(): bool
+    {
+        foreach ([
+            'payment_robokassa_credit_status',
+            'payment_robokassa_mokka_status',
+            'payment_robokassa_podeli_status',
+            'payment_robokassa_yandex_split_status'
+        ] as $status_key) {
+            if ((int)$this->config->get($status_key)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function buildWidgetData(int $product_id, int $quantity): array
     {
-        if (!$this->config->get('payment_robokassa_widget_status') || $this->config->get('payment_robokassa_country') !== 'RUB') {
+        if (!$this->config->get('payment_robokassa_widget_status') || !$this->hasEnabledInstallmentPaymentMethod() || $this->config->get('payment_robokassa_country') !== 'RUB') {
             return [];
         }
 

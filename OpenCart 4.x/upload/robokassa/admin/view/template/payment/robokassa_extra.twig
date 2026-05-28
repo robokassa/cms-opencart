@@ -3,7 +3,7 @@
 	<div class="page-header">
 		<div class="container-fluid">
 			<div class="float-end">
-				<button type="submit" form="form-payment" data-bs-toggle="tooltip" title="{{ button_save }}" class="btn btn-primary"><i class="fa-solid fa-save"></i></button>
+				<button type="submit" form="form-payment" data-bs-toggle="tooltip" title="{{ button_save }}" class="btn btn-primary"><i class="fas fa-save"></i></button>
 				<a href="{{ back }}" data-bs-toggle="tooltip" title="{{ button_back }}" class="btn btn-light"><i class="fas fa-reply"></i></a>
 			</div>
 			<h1>{{ heading_title }}</h1>
@@ -18,6 +18,9 @@
 		{% if error_warning %}
 			<div class="alert alert-danger">{{ error_warning }}</div>
 		{% endif %}
+		{% if is_widget and not widget_payment_methods_enabled %}
+			<div class="alert alert-warning">{{ text_widget_payment_methods_required }}</div>
+		{% endif %}
 		<div class="panel panel-default">
 			<div class="panel-heading"><h3 class="panel-title"><i class="fa fa-pencil"></i> {{ text_edit }}</h3></div>
 			<div class="panel-body">
@@ -25,7 +28,10 @@
 					<div class="form-group">
 						<label class="col-sm-2 control-label" for="input-status">{{ entry_status }}</label>
 						<div class="col-sm-10">
-							<select name="{{ status_key }}" id="input-status" class="form-control">
+							{% if is_widget and not widget_payment_methods_enabled %}
+								<input type="hidden" name="{{ status_key }}" value="0"/>
+							{% endif %}
+							<select name="{{ status_key }}" id="input-status" class="form-control"{% if is_widget and not widget_payment_methods_enabled %} disabled="disabled"{% endif %}>
 								<option value="1"{% if status %} selected="selected"{% endif %}>{{ text_enabled }}</option>
 								<option value="0"{% if not status %} selected="selected"{% endif %}>{{ text_disabled }}</option>
 							</select>

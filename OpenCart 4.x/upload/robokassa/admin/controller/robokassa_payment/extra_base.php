@@ -1,13 +1,13 @@
 <?php
 namespace Opencart\Admin\Controller\Extension\Robokassa\Payment;
 
-class RobokassaSbp extends \Opencart\System\Engine\Controller
+class RobokassaExtraBase extends \Opencart\System\Engine\Controller
 {
     protected array $error = [];
-    protected string $code = 'robokassa_sbp';
-    protected string $setting_code = 'payment_robokassa_sbp';
-    protected string $status_key = 'payment_robokassa_sbp_status';
-    protected string $sort_order_key = 'payment_robokassa_sbp_sort_order';
+    protected string $code = '';
+    protected string $setting_code = '';
+    protected string $status_key = '';
+    protected string $sort_order_key = '';
 
     public function index(): void
     {
@@ -17,7 +17,6 @@ class RobokassaSbp extends \Opencart\System\Engine\Controller
 
         if (($this->request->server['REQUEST_METHOD'] === 'POST') && $this->validate()) {
             $this->saveSettingDirect($this->setting_code, $this->request->post);
-            $this->session->data['success'] = $this->language->get('text_success');
             $this->response->redirect($this->url->link('marketplace/extension', 'user_token=' . $this->session->data['user_token'] . '&type=payment', true));
         }
 
@@ -62,6 +61,46 @@ class RobokassaSbp extends \Opencart\System\Engine\Controller
         }
 
         return !$this->error;
+    }
+
+    public function install(): void
+    {
+        $this->registerPaymentListFilterEvents();
+    }
+
+    public function uninstall(): void
+    {
+        $this->registerPaymentListFilterEvents();
+    }
+
+    protected function registerPaymentListFilterEvents(): void
+    {
+        $this->load->model('setting/event');
+
+        foreach (['robokassa_admin_payment_extension_after_dot', 'robokassa_admin_payment_extension_after_pipe'] as $code) {
+            $this->model_setting_event->deleteEventByCode($code);
+        }
+
+        foreach ([
+            [
+                'code'        => 'robokassa_admin_payment_extension_after_dot',
+                'description' => 'Robokassa admin payment extension list filter (dot)',
+                'trigger'     => 'admin/view/extension/payment/after',
+                'action'      => 'extension/robokassa/event/robokassa.onPaymentExtensionViewAfter',
+                'status'      => 1,
+                'sort_order'  => 8
+            ],
+            [
+                'code'        => 'robokassa_admin_payment_extension_after_pipe',
+                'description' => 'Robokassa admin payment extension list filter (pipe)',
+                'trigger'     => 'admin/view/extension/payment/after',
+                'action'      => 'extension/robokassa/event/robokassa|onPaymentExtensionViewAfter',
+                'status'      => 1,
+                'sort_order'  => 9
+            ]
+        ] as $event) {
+            $this->model_setting_event->addEvent($event);
+        }
     }
 
     protected function saveSettingDirect(string $code, array $data, int $store_id = 0): void

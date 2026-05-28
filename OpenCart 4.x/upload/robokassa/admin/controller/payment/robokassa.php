@@ -14,6 +14,10 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $this->load->model('setting/setting');
         $this->load->model('localisation/language');
 
+        if ($this->request->server['REQUEST_METHOD'] !== 'POST') {
+            $this->syncExtraPaymentControllers($this->getStoredInstallmentAliases());
+        }
+
         if (($this->request->server['REQUEST_METHOD'] === 'POST') && $this->validate()) {
             $is_update_request = isset($this->request->post['robokassa_action']) && $this->request->post['robokassa_action'] === 'update_methods';
             $methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
@@ -41,6 +45,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
                     'payment_robokassa_methods_aliases' => $aliases
                 ]);
 
+                $this->syncExtraPaymentControllers($aliases);
                 $methods_updated = true;
             }
 
@@ -51,8 +56,8 @@ class Robokassa extends \Opencart\System\Engine\Controller
             $this->model_user_user_group->addPermission($this->user->getGroupId(), 'access', $route);
             $this->model_user_user_group->addPermission($this->user->getGroupId(), 'modify', $route);
 
-            if ($methods_updated) {
-                $this->session->data['success'] = 'Robokassa payment methods updated.';
+            if ($methods_updated && $is_update_request) {
+                $this->session->data['robokassa_methods_success'] = 'Robokassa payment methods updated.';
             }
 
             if ($is_update_request) {
@@ -64,8 +69,8 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $data['error_warning'] = $this->session->data['error_warning'] ?? ($this->error['warning'] ?? '');
         unset($this->session->data['error_warning']);
-        $data['success'] = $this->session->data['success'] ?? '';
-        unset($this->session->data['success']);
+        $data['success'] = $this->session->data['robokassa_methods_success'] ?? '';
+        unset($this->session->data['robokassa_methods_success']);
         $data['error_merch_login'] = $this->error['merch_login'] ?? '';
         $data['error_password1'] = $this->error['e_password1'] ?? '';
         $data['error_password2'] = $this->error['e_password2'] ?? '';
@@ -427,14 +432,122 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $this->model_user_user_group->addPermission($this->user->getGroupId(), 'access', $route);
         $this->model_user_user_group->addPermission($this->user->getGroupId(), 'modify', $route);
 
+        $this->syncExtraPaymentControllers($this->getStoredInstallmentAliases());
         $this->registerEvents();
         $this->sendPulseStatusChange('enabled');
     }
 
     public function uninstall(): void
     {
+        $this->syncExtraPaymentControllers([]);
         $this->unregisterEvents();
         $this->sendPulseStatusChange('disabled');
+    }
+
+    private function syncExtraPaymentControllers(array $aliases): void
+    {
+        $aliases = array_values(array_unique(array_map(static function ($alias): string {
+            return strtolower((string)$alias);
+        }, $aliases)));
+
+        $alias_map = [
+            'robokassa_credit'       => 'otp',
+            'robokassa_mokka'        => 'mokka',
+            'robokassa_podeli'       => 'podeli',
+            'robokassa_sbp'          => 'sbp',
+            'robokassa_yandex_split' => 'yandexpaysplit'
+        ];
+
+        $bnpl_aliases = ['otp', 'mokka', 'podeli', 'yandexpaysplit'];
+        $enabled_codes = [];
+
+        foreach ($alias_map as $code => $alias) {
+            if (in_array($alias, $aliases, true)) {
+                $enabled_codes[] = $code;
+            }
+        }
+
+        if (array_intersect($bnpl_aliases, $aliases)) {
+            $enabled_codes[] = 'robokassa_widget';
+        }
+
+        $managed_codes = array_merge(array_keys($alias_map), ['robokassa_widget']);
+        $this->load->model('setting/extension');
+
+        foreach ($managed_codes as $code) {
+            $source = DIR_EXTENSION . 'robokassa/admin/controller/robokassa_payment/' . $code . '.php';
+            $target = DIR_EXTENSION . 'robokassa/admin/controller/payment/' . $code . '.php';
+
+            if (in_array($code, $enabled_codes, true)) {
+                if (is_file($source) && (!is_file($target) || md5_file($source) !== md5_file($target))) {
+                    @copy($source, $target);
+                }
+
+                $this->addExtraPaymentControllerPath($code);
+
+                continue;
+            }
+
+            $this->model_setting_extension->uninstall('payment', $code);
+            $this->deleteExtraPaymentControllerPath($code);
+
+            if (is_file($target)) {
+                @unlink($target);
+            }
+        }
+    }
+
+    private function addExtraPaymentControllerPath(string $code): void
+    {
+        $path = 'robokassa/admin/controller/payment/' . $code . '.php';
+
+        $query = $this->db->query("SELECT `extension_path_id` FROM `" . DB_PREFIX . "extension_path` WHERE `path` = '" . $this->db->escape($path) . "' LIMIT 1");
+
+        if ($query->num_rows) {
+            return;
+        }
+
+        $extension_install_id = $this->getRobokassaExtensionInstallId();
+
+        if ($extension_install_id <= 0) {
+            return;
+        }
+
+        $this->db->query("INSERT INTO `" . DB_PREFIX . "extension_path` SET `extension_install_id` = '" . (int)$extension_install_id . "', `path` = '" . $this->db->escape($path) . "'");
+    }
+
+    private function deleteExtraPaymentControllerPath(string $code): void
+    {
+        $path = 'robokassa/admin/controller/payment/' . $code . '.php';
+
+        $this->db->query("DELETE FROM `" . DB_PREFIX . "extension_path` WHERE `path` = '" . $this->db->escape($path) . "'");
+    }
+
+    private function getRobokassaExtensionInstallId(): int
+    {
+        $query = $this->db->query("SELECT `extension_install_id` FROM `" . DB_PREFIX . "extension_path` WHERE `path` IN ('robokassa/install.json', 'robokassa/admin/controller/payment/robokassa.php') ORDER BY `extension_install_id` DESC LIMIT 1");
+
+        if ($query->num_rows) {
+            return (int)$query->row['extension_install_id'];
+        }
+
+        $query = $this->db->query("SELECT `extension_install_id` FROM `" . DB_PREFIX . "extension_install` WHERE `code` IN ('robokassa', 'Robokassa') ORDER BY `extension_install_id` DESC LIMIT 1");
+
+        return $query->num_rows ? (int)$query->row['extension_install_id'] : 0;
+    }
+
+    private function getStoredInstallmentAliases(): array
+    {
+        $methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
+        $current_login = trim((string)$this->config->get('payment_robokassa_login'));
+        $methods_login = trim((string)$this->config->get('payment_robokassa_methods_login'));
+        $aliases = $this->config->get('payment_robokassa_methods_aliases');
+
+        if (!$methods_initialized || $current_login === '' || $methods_login !== $current_login || !is_array($aliases)) {
+            return [];
+        }
+
+        return $aliases;
     }
 
     private function registerEvents(): void

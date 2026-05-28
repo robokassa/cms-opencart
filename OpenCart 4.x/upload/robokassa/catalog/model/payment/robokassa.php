@@ -50,11 +50,6 @@ class Robokassa extends \Opencart\System\Engine\Model {
             return [];
         }
 
-        if (in_array($code, ['robokassa_mokka', 'robokassa_podeli', 'robokassa_yandex_split'], true)) {
-            $graph_method = $this->getGraphPaymentMethod($code);
-            $title .= '<div class="robokassa-checkout-graph" data-payment-method="' . $this->db->escape($graph_method) . '"><robokassa-graph merchantLogin="' . $this->db->escape((string)$this->config->get('payment_robokassa_login')) . '" outSum="' . number_format($total, 2, '.', '') . '" paymentMethod="' . $this->db->escape($graph_method) . '"></robokassa-graph></div>';
-        }
-
         $method = [
             'code'       => $code,
             'title'      => $title,

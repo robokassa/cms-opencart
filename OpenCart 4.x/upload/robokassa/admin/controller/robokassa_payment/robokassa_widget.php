@@ -1,9 +1,9 @@
 <?php
 namespace Opencart\Admin\Controller\Extension\Robokassa\Payment;
 
-require_once DIR_EXTENSION . 'robokassa/admin/controller/payment/robokassa_sbp.php';
+require_once DIR_EXTENSION . 'robokassa/admin/controller/robokassa_payment/extra_base.php';
 
-class RobokassaWidget extends RobokassaSbp
+class RobokassaWidget extends RobokassaExtraBase
 {
     protected string $code = 'robokassa_widget';
     protected string $setting_code = 'payment_robokassa_widget';
@@ -14,6 +14,12 @@ class RobokassaWidget extends RobokassaSbp
     {
         $data = parent::buildData();
         $data['is_widget'] = true;
+        $data['widget_payment_methods_enabled'] = $this->hasEnabledInstallmentPaymentMethod();
+        $data['text_widget_payment_methods_required'] = $this->language->get('text_widget_payment_methods_required');
+
+        if (!$data['widget_payment_methods_enabled']) {
+            $data['status'] = 0;
+        }
 
         foreach ([
             'payment_robokassa_widget_bnpl_theme' => 'light',
@@ -37,17 +43,39 @@ class RobokassaWidget extends RobokassaSbp
 
     protected function saveSettingDirect(string $code, array $data, int $store_id = 0): void
     {
+        if (!$this->hasEnabledInstallmentPaymentMethod()) {
+            $data[$this->status_key] = 0;
+        }
+
         parent::saveSettingDirect($code, $data, $store_id);
         $this->registerProductWidgetEvents();
     }
 
+    private function hasEnabledInstallmentPaymentMethod(): bool
+    {
+        foreach ([
+            'payment_robokassa_credit_status',
+            'payment_robokassa_mokka_status',
+            'payment_robokassa_podeli_status',
+            'payment_robokassa_yandex_split_status'
+        ] as $status_key) {
+            if ((int)$this->config->get($status_key)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function install(): void
     {
+        $this->registerPaymentListFilterEvents();
         $this->registerProductWidgetEvents();
     }
 
     public function uninstall(): void
     {
+        $this->registerPaymentListFilterEvents();
         $this->load->model('setting/event');
 
         foreach ([

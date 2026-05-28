@@ -1,9 +1,9 @@
 <?php
 namespace Opencart\Admin\Controller\Extension\Robokassa\Payment;
 
-require_once DIR_EXTENSION . 'robokassa/admin/controller/payment/robokassa_sbp.php';
+require_once DIR_EXTENSION . 'robokassa/admin/controller/robokassa_payment/extra_base.php';
 
-class RobokassaCredit extends RobokassaSbp
+class RobokassaCredit extends RobokassaExtraBase
 {
     protected string $code = 'robokassa_credit';
     protected string $setting_code = 'payment_robokassa_credit';

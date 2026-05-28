@@ -7,44 +7,18 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
     private function getRobokassaInstallmentAliases(): array
     {
-        $robokassa_installment_aliases = [];
         $robokassa_methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
         $robokassa_current_login = trim((string)$this->config->get('payment_robokassa_login'));
         $robokassa_saved_login = trim((string)$this->config->get('payment_robokassa_methods_login'));
-        $robokassa_merchant_login = ($robokassa_methods_initialized && $robokassa_current_login !== '' && $robokassa_saved_login === $robokassa_current_login) ? $robokassa_saved_login : '';
+        $robokassa_aliases = $this->config->get('payment_robokassa_methods_aliases');
 
-        if ($robokassa_merchant_login !== '') {
-            $robokassa_currency_url = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/GetCurrencies?MerchantLogin=' . rawurlencode($robokassa_merchant_login) . '&Language=ru';
-            $robokassa_currency_xml = false;
-
-            if (function_exists('curl_init')) {
-                $robokassa_ch = curl_init($robokassa_currency_url);
-                curl_setopt($robokassa_ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($robokassa_ch, CURLOPT_CONNECTTIMEOUT, 3);
-                curl_setopt($robokassa_ch, CURLOPT_TIMEOUT, 3);
-                $robokassa_currency_xml = curl_exec($robokassa_ch);
-                curl_close($robokassa_ch);
-            }
-
-            if ($robokassa_currency_xml === false && ini_get('allow_url_fopen')) {
-                $robokassa_currency_context = stream_context_create([
-                    'http' => [
-                        'timeout' => 3
-                    ]
-                ]);
-                $robokassa_currency_xml = @file_get_contents($robokassa_currency_url, false, $robokassa_currency_context);
-            }
-
-            if ($robokassa_currency_xml !== false && strpos($robokassa_currency_xml, '<Code>0</Code>') !== false && preg_match_all('/\bAlias="([^"]+)"/i', $robokassa_currency_xml, $robokassa_aliases_match)) {
-                foreach ($robokassa_aliases_match[1] as $robokassa_alias) {
-                    $robokassa_installment_aliases[] = strtolower((string)$robokassa_alias);
-                }
-
-                $robokassa_installment_aliases = array_unique($robokassa_installment_aliases);
-            }
+        if (!$robokassa_methods_initialized || $robokassa_current_login === '' || $robokassa_saved_login !== $robokassa_current_login || !is_array($robokassa_aliases)) {
+            return [];
         }
 
-        return $robokassa_installment_aliases;
+        return array_values(array_unique(array_map(static function ($robokassa_alias): string {
+            return strtolower((string)$robokassa_alias);
+        }, $robokassa_aliases)));
     }
 
     private function filterRobokassaPaymentList(string $output): string

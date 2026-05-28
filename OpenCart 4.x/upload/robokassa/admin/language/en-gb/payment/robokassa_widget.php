@@ -1,4 +1,5 @@
 <?php
+$_['text_widget_payment_methods_required'] = 'Enable at least one installment or credit payment method before enabling the widget.';
 $_['heading_title'] = 'Robokassa installment and credit widget';
 $_['text_payment'] = 'Payment';
 $_['text_success'] = 'Robokassa widget settings updated!';
