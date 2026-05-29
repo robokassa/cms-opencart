@@ -251,13 +251,6 @@ class Robokassa extends \Opencart\System\Engine\Controller
         return $this->load->view('extension/robokassa/payment/robokassa', $data);
     }
 
-    public function test()
-    {
-        $this->load->model('extension/robokassa/payment/robokassa');
-
-        $this->model_extension_payment_robokassa->sendSecondCheck(82);
-    }
-
     public function status(): void
     {
         $this->load->model('checkout/order');

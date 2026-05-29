@@ -85,20 +85,14 @@ class Robokassa extends \Opencart\System\Engine\Controller
         if ($new_status_id !== 7 && $new_status_id !== 2) return false;
         if (!(int)$this->config->get('payment_robokassa_status_hold')) return false;
 
-        $q = $this->db->query(
-            "SELECT order_status_id, payment_method
-             FROM `" . DB_PREFIX . "order`
-             WHERE order_id = '" . (int)$order_id . "'
-             LIMIT 1"
-        );
+        $order = $this->getOrderRow($order_id);
 
-        if (!$q->num_rows) return false;
+        if (!$order) return false;
 
-        $old_status_id  = (int)$q->row['order_status_id'];
-        $payment_method = (string)$q->row['payment_method'];
+        $old_status_id = (int)$order['order_status_id'];
 
         if ($old_status_id !== 1) return false;
-        if (stripos($payment_method, 'robokassa') === false) return false;
+        if (!$this->isRobokassaOrder($order)) return false;
 
         return true;
     }
@@ -115,19 +109,41 @@ class Robokassa extends \Opencart\System\Engine\Controller
             return false;
         }
 
+        if (trim((string)$this->config->get('payment_robokassa_payment_method')) === 'full_payment') {
+            return false;
+        }
+
+        $order = $this->getOrderRow($order_id);
+
+        if (!$order) {
+            return false;
+        }
+
+        return (int)$order['order_status_id'] !== $new_status_id
+            && $this->isRobokassaOrder($order);
+    }
+
+    private function getOrderRow(int $order_id): array
+    {
         $query = $this->db->query(
-            "SELECT order_status_id, payment_method
+            "SELECT *
              FROM `" . DB_PREFIX . "order`
              WHERE order_id = '" . (int)$order_id . "'
              LIMIT 1"
         );
 
-        if (!$query->num_rows) {
-            return false;
+        return $query->num_rows ? $query->row : [];
+    }
+
+    private function isRobokassaOrder(array $order): bool
+    {
+        $payment_code = (string)($order['payment_code'] ?? '');
+
+        if ($payment_code !== '' && strpos($payment_code, 'robokassa') === 0) {
+            return true;
         }
 
-        return (int)$query->row['order_status_id'] !== $new_status_id
-            && stripos((string)$query->row['payment_method'], 'robokassa') !== false;
+        return stripos((string)($order['payment_method'] ?? ''), 'robokassa') !== false;
     }
 
     private function runOnce(int $order_id, int $new_status_id): void

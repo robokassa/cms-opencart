@@ -75,6 +75,10 @@ public function sendSecondCheck(int $order_id): bool
         ? (string)$this->config->get('payment_robokassa_test_password_1')
         : (string)$this->config->get('payment_robokassa_password_1');
 
+    if (trim((string)$this->config->get('payment_robokassa_payment_method')) === 'full_payment') {
+        return false;
+    }
+
     if ($merchant === '' || $password1 === '') {
         return false;
     }
