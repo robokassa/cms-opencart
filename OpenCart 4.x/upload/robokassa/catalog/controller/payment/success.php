@@ -25,7 +25,7 @@ class Success extends \Opencart\System\Engine\Controller {
 
         $crc = strtoupper($crc);
 
-        $my_crc = $this->getSignature($out_summ, $order_id, $password_1);
+        $my_crc = $this->getSignature($out_summ, $order_id, $password_1, $request_data);
 
         if ($my_crc !== $crc) {
             $this->log->write('ROBOKASSA success: signature mismatch. InvId=' . $order_id . ' OutSum=' . (string)$out_summ);
@@ -59,9 +59,25 @@ class Success extends \Opencart\System\Engine\Controller {
         $this->response->redirect($this->url->link('checkout/success', '', true));
     }
 
-    private function getSignature($out_summ, int $order_id, string $password): string
+    private function getSignature($out_summ, int $order_id, string $password, array $request_data): string
     {
-        return strtoupper(md5($out_summ . ":" . $order_id . ":" . $password . ":Shp_item=1:Shp_label=official_opencart"));
+        $shp = [];
+
+        foreach ($request_data as $key => $value) {
+            if (stripos((string)$key, 'Shp_') === 0 || stripos((string)$key, 'shp_') === 0) {
+                $shp[(string)$key] = (string)$value;
+            }
+        }
+
+        ksort($shp, SORT_STRING);
+
+        $parts = [$out_summ, $order_id, $password];
+
+        foreach ($shp as $key => $value) {
+            $parts[] = $key . '=' . $value;
+        }
+
+        return strtoupper(md5(implode(':', $parts)));
     }
 
     private function clearCheckoutSession(int $order_customer_id = 0): void

@@ -1,9 +1,51 @@
-{% if robokassa_status_iframe %}
+{% if inc_curr_label %}
+    <script type="text/javascript" src="https://auth.robokassa.ru/Merchant/PaymentForm/DirectPayment.js"></script>
+    {% if graph_config_json != 'null' %}
+        <script type="text/javascript">
+        (function() {
+            var config = {{ graph_config_json|raw }};
+
+            if (!config) {
+                return;
+            }
+
+            var node = document.getElementById('robokassa-checkout-graph-config');
+
+            if (!node) {
+                node = document.createElement('div');
+                node.id = 'robokassa-checkout-graph-config';
+                node.hidden = true;
+                document.body.appendChild(node);
+            }
+
+            node.setAttribute('data-config', JSON.stringify(config));
+
+            var legacyContainer = document.getElementById('robokassa-confirm-graph-container');
+
+            if (legacyContainer && legacyContainer.parentNode) {
+                legacyContainer.parentNode.removeChild(legacyContainer);
+            }
+
+            if (typeof window.robokassaCheckoutGraphScan === 'function') {
+                window.robokassaCheckoutGraphScan();
+            } else if (typeof Event === 'function') {
+                document.dispatchEvent(new Event('robokassa:checkout-graph-config'));
+            }
+        })();
+        </script>
+    {% endif %}
+    <div class="buttons">
+        <div class="pull-right">
+            <input type="button" value="{{ button_confirm }}" class="btn btn-primary"
+                   onclick="Robo.directPayment.startOp({MerchantLogin: '{{ robokassa_login }}', OutSum: '{{ out_summ }}', InvId: '{{ inv_id }}', Description: '{{ order_desc }}', Email: '{{ email }}', {% if out_summ_currency %}OutSumCurrency: '{{ out_summ_currency }}', {% endif %}{% if robokassa_fiscal %}Receipt: '{{ receipt }}', {% endif %}IncCurrLabel: '{{ inc_curr_label }}', SignatureValue: '{{ crc }}', Shp_item: '1', Shp_label: 'official_opencart', Culture: '{{ culture }}'{% if robokassa_test %}, IsTest: '1' {% endif %}})">
+        </div>
+    </div>
+{% elseif robokassa_status_iframe %}
     <script type="text/javascript" src="{{ iframeUrl }}"></script>
     <div class="buttons">
         <div class="pull-right">
             <input type="submit" value="{{ button_confirm }}" class="btn btn-primary"
-                   onclick="Robokassa.StartPayment({MerchantLogin: '{{ robokassa_login }}',    OutSum: '{{ out_summ }}', InvId: '{{ inv_id }}', Description: '{{ order_desc }}', Email: '{{ email }}', {% if out_summ_currency %} OutSumCurrency: '{{ out_summ_currency }}', {% endif %} {% if robokassa_fiscal %} Receipt: '{{ receipt }}', {% endif %} {% if robokassa_status_hold %} StepByStep: 'true', ResultUrl2: '{{ result2_url }}', {% endif %} SignatureValue: '{{ crc }}', Shp_item: '1', Shp_label: 'official_opencart', Culture: '{{ culture }}'{% if robokassa_test %}, IsTest: '1' {% endif %}})">
+                   onclick="Robokassa.StartPayment({MerchantLogin: '{{ robokassa_login }}',    OutSum: '{{ out_summ }}', InvId: '{{ inv_id }}', Description: '{{ order_desc }}', Email: '{{ email }}', {% if out_summ_currency %} OutSumCurrency: '{{ out_summ_currency }}', {% endif %} {% if robokassa_fiscal %} Receipt: '{{ receipt }}', {% endif %} {% if inc_curr_label %} IncCurrLabel: '{{ inc_curr_label }}', {% endif %} {% if robokassa_status_hold %} StepByStep: 'true', ResultUrl2: '{{ result2_url }}', {% endif %} SignatureValue: '{{ crc }}', Shp_item: '1', Shp_label: 'official_opencart', Culture: '{{ culture }}'{% if robokassa_test %}, IsTest: '1' {% endif %}})">
         </div>
     </div>
 {% else %}
@@ -31,7 +73,9 @@
         {% if robokassa_test %}
             <input type="hidden" name="IsTest" value="1"/>
         {% endif %}
-        <input type="hidden" name="IncCurrLabel" value=""/>
+        {% if inc_curr_label %}
+            <input type="hidden" name="IncCurrLabel" value="{{ inc_curr_label }}"/>
+        {% endif %}
         <input type="hidden" name="Culture" value="{{ culture }}"/>
         <div class="buttons">
             <div class="pull-right">

@@ -68,6 +68,131 @@ public function holdConfirm(int $order_id): bool
     return stripos($response, 'OK') !== false;
 }
 
+public function sendSecondCheck(int $order_id): bool
+{
+    $merchant = (string)$this->config->get('payment_robokassa_login');
+    $password1 = (int)$this->config->get('payment_robokassa_test')
+        ? (string)$this->config->get('payment_robokassa_test_password_1')
+        : (string)$this->config->get('payment_robokassa_password_1');
+
+    if (trim((string)$this->config->get('payment_robokassa_payment_method')) === 'full_payment') {
+        return false;
+    }
+
+    if ($merchant === '' || $password1 === '') {
+        return false;
+    }
+
+    $order_query = $this->db->query(
+        "SELECT `total`, `email`, `telephone`
+         FROM `" . DB_PREFIX . "order`
+         WHERE order_id = '" . (int)$order_id . "'
+         LIMIT 1"
+    );
+
+    if (!$order_query->num_rows) {
+        return false;
+    }
+
+    $order = $order_query->row;
+    $tax = (string)$this->config->get('payment_robokassa_tax');
+    $payment_object = (string)$this->config->get('payment_robokassa_payment_object');
+    $items = [];
+
+    $products = $this->db->query(
+        "SELECT op.product_id, op.name, op.quantity, op.total, p.upc
+         FROM `" . DB_PREFIX . "order_product` op
+         LEFT JOIN `" . DB_PREFIX . "product` p ON (p.product_id = op.product_id)
+         WHERE op.order_id = '" . (int)$order_id . "'
+         ORDER BY op.order_product_id ASC"
+    );
+
+    foreach ($products->rows as $product) {
+        $items[] = $this->buildSecondCheckItem(
+            (string)$product['name'],
+            (float)$product['total'],
+            (float)$product['quantity'],
+            $tax,
+            $payment_object,
+            (string)($product['upc'] ?? '')
+        );
+    }
+
+    $shipping = $this->db->query(
+        "SELECT `title`, `value`
+         FROM `" . DB_PREFIX . "order_total`
+         WHERE order_id = '" . (int)$order_id . "' AND code = 'shipping'
+         ORDER BY sort_order ASC
+         LIMIT 1"
+    );
+
+    if ($shipping->num_rows && (float)$shipping->row['value'] > 0) {
+        $items[] = $this->buildSecondCheckItem(
+            (string)$shipping->row['title'],
+            (float)$shipping->row['value'],
+            1,
+            $tax,
+            $payment_object
+        );
+    }
+
+    if (!$items) {
+        return false;
+    }
+
+    $scheme = !empty($this->request->server['HTTPS']) && strtolower((string)$this->request->server['HTTPS']) !== 'off' ? 'https://' : 'http://';
+    $host = (string)($this->request->server['HTTP_HOST'] ?? '');
+    $fields = [
+        'merchantId' => $merchant,
+        'id' => $order_id + 1,
+        'originId' => $order_id,
+        'operation' => 'sell',
+        'sno' => (string)$this->config->get('payment_robokassa_tax_type'),
+        'url' => urlencode($scheme . $host),
+        'total' => (float)$order['total'],
+        'items' => $items,
+        'client' => [
+            'email' => (string)$order['email'],
+            'phone' => (string)$order['telephone']
+        ],
+        'payments' => [
+            [
+                'type' => 2,
+                'sum' => (float)$order['total']
+            ]
+        ],
+        'vats' => []
+    ];
+
+    $startup_hash = $this->encodeFiscalToken((string)json_encode($fields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    $sign = $this->encodeFiscalToken(md5($startup_hash . $password1));
+
+    return $this->postRaw('https://ws.roboxchange.com/RoboFiscal/Receipt/Attach', $startup_hash . '.' . $sign);
+}
+
+private function buildSecondCheckItem(string $name, float $sum, float $quantity, string $tax, string $payment_object, string $upc = ''): array
+{
+    $item = [
+        'name' => mb_substr(trim(htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')), 0, 63, 'UTF-8'),
+        'quantity' => ((int)$quantity == $quantity) ? (int)$quantity : $quantity,
+        'sum' => (float)number_format($sum, 2, '.', ''),
+        'tax' => $tax !== '' ? $tax : 'none',
+        'payment_method' => 'full_payment',
+        'payment_object' => $payment_object !== '' ? $payment_object : 'commodity'
+    ];
+
+    if ($upc !== '') {
+        $item['nomenclature_code'] = $upc;
+    }
+
+    return $item;
+}
+
+private function encodeFiscalToken(string $value): string
+{
+    return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+}
+
 private function buildConfirmReceipt(int $order_id): array
 {
     $pm  = (string)$this->config->get('payment_robokassa_payment_method');
@@ -159,5 +284,32 @@ private function buildConfirmReceipt(int $order_id): array
 
         curl_close($ch);
         return (string)$result;
+    }
+
+    private function postRaw(string $url, string $payload): bool
+    {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Content-Length: ' . strlen($payload)
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+
+        $result = curl_exec($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        if ($result === false) {
+            $error = curl_error($ch);
+            curl_close($ch);
+            throw new \RuntimeException($error);
+        }
+
+        curl_close($ch);
+
+        return $status >= 200 && $status < 300;
     }
 }

@@ -1,0 +1,613 @@
+<div class="robokassa-sbp-payment" data-sbp-config="{{ sbp_config_json|e('html_attr') }}">
+    {% if error_message %}
+        <div class="alert alert-danger">{{ error_message }}</div>
+    {% else %}
+        <div class="robokassa-sbp-payment__card">
+            <div class="robokassa-sbp-payment__label">{{ text_qr_label }}</div>
+            <div class="robokassa-sbp-payment__caption">{{ text_qr_caption }}</div>
+            <div class="robokassa-sbp-payment__qr-shell">
+                <div id="{{ qr_container_id }}" class="robokassa-sbp-payment__qr">
+                    <button type="button" class="btn btn-primary robokassa-sbp-payment__show" id="robokassa-sbp-show-{{ inv_id }}">{{ text_qr_show }}</button>
+                </div>
+            </div>
+            <div class="robokassa-sbp-payment__status" id="robokassa-sbp-status-{{ inv_id }}"></div>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    .robokassa-sbp-payment {
+        max-width: 430px;
+        margin-top: 12px;
+    }
+
+    .robokassa-sbp-payment__card {
+        border: 1px solid #e3e6ea;
+        border-radius: 16px;
+        background: #fff;
+        padding: 18px 18px 16px;
+        box-sizing: border-box;
+    }
+
+    .robokassa-sbp-payment__label {
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.35;
+        color: #4a4f57;
+        margin-bottom: 6px;
+    }
+
+    .robokassa-sbp-payment__caption,
+    .robokassa-sbp-payment__status {
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .robokassa-sbp-payment__caption {
+        margin-bottom: 14px;
+    }
+
+    .robokassa-sbp-payment__qr-shell {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: {{ qr_container_size }}px;
+        margin-bottom: 12px;
+        padding: 10px;
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    .robokassa-sbp-payment__qr {
+        width: {{ qr_container_size }}px;
+        max-width: 100%;
+        min-height: {{ qr_container_size }}px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+    }
+
+    .robokassa-sbp-payment__qr canvas,
+    .robokassa-sbp-payment__qr svg,
+    .robokassa-sbp-payment__qr img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .robokassa-sbp-payment__qr iframe {
+        display: block;
+        width: {{ qr_container_size }}px !important;
+        max-width: 100%;
+        height: {{ qr_container_size }}px !important;
+        min-height: {{ qr_container_size }}px;
+        border: 0;
+        margin: 0 auto;
+    }
+
+    .robokassa-sbp-payment__show {
+        max-width: 100%;
+        white-space: normal;
+    }
+</style>
+
+{% if not error_message %}
+<script type="text/javascript">
+(function() {
+    var state = window.robokassaSbpState || (window.robokassaSbpState = {});
+    var statusNode = document.getElementById('robokassa-sbp-status-{{ inv_id }}');
+    var statusUrl = {{ status_url_js|raw }};
+    var successUrl = {{ success_url_js|raw }};
+    var qrContainerId = {{ qr_container_id_js|raw }};
+    var showButtonId = 'robokassa-sbp-show-{{ inv_id }}';
+    var shpParams = {{ shp_params_js|raw }};
+    var merchantScriptSrc = 'https://auth.robokassa.ru/merchant/bundle/robokassa-iframe-badge.js';
+    var stateKey = 'order_{{ inv_id }}';
+    var pollInterval = 1000;
+
+    function setStatus(text) {
+        if (statusNode) {
+            statusNode.textContent = text;
+        }
+    }
+
+    function normalizePaymentCode(value) {
+        value = String(value || '');
+
+        if (value.indexOf('|') !== -1) {
+            var pipeParts = value.split('|');
+            value = pipeParts[pipeParts.length - 1];
+        }
+
+        if (value.indexOf('.') !== -1) {
+            var dotParts = value.split('.');
+            value = dotParts[dotParts.length - 1];
+        }
+
+        if (value.indexOf('/') !== -1) {
+            var slashParts = value.split('/');
+            value = slashParts[slashParts.length - 1];
+        }
+
+        return value;
+    }
+
+    function triggerClick(element) {
+        if (!element) {
+            return;
+        }
+
+        if (window.jQuery) {
+            window.jQuery(element).trigger('click');
+        } else {
+            element.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+        }
+    }
+
+    function isCheckoutReadyForQr() {
+        var shippingSelect = document.getElementById('input-shipping-method') || document.querySelector('select[name="shipping_method"]');
+
+        if (shippingSelect && !shippingSelect.disabled && !shippingSelect.value) {
+            triggerClick(document.getElementById('button-shipping-method'));
+            return false;
+        }
+
+        var paymentSelect = document.getElementById('input-payment-method') || document.querySelector('select[name="payment_method"]');
+
+        if (paymentSelect && !paymentSelect.disabled && normalizePaymentCode(paymentSelect.value) !== 'robokassa_sbp') {
+            return false;
+        }
+
+        return true;
+    }
+
+    function hasStartOp() {
+        return !!(window.Robokassa && window.Robokassa.pay && typeof window.Robokassa.pay.startOp === 'function');
+    }
+
+    function stopPolling() {
+        if (state[stateKey] && state[stateKey].intervalId) {
+            window.clearInterval(state[stateKey].intervalId);
+            state[stateKey].intervalId = null;
+        }
+    }
+
+    function pollStatus() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', statusUrl, true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== 4 || xhr.status < 200 || xhr.status >= 300) {
+                return;
+            }
+
+            try {
+                var response = JSON.parse(xhr.responseText);
+
+                if (response && response.paid) {
+                    stopPolling();
+                    window.location.href = response.success_url || successUrl;
+                }
+            } catch (e) {}
+        };
+        xhr.send();
+    }
+
+    function startPolling() {
+        state[stateKey] = state[stateKey] || {};
+        stopPolling();
+        pollStatus();
+        state[stateKey].intervalId = window.setInterval(pollStatus, pollInterval);
+    }
+
+    function buildOptions() {
+        var options = {
+            paymentMethod: 'SBP',
+            email: {{ email_js|raw }},
+            merchantLogin: {{ robokassa_login_js|raw }},
+            outSum: {{ out_summ_js|raw }},
+            invId: {{ inv_id_js|raw }},
+            signature: {{ signature_js|raw }},
+            qrContainerId: qrContainerId,
+            qrContainerSize: {{ qr_container_size }}
+        };
+
+        var receipt = {{ receipt_js|raw }};
+
+        if (receipt) {
+            options.receipt = receipt;
+        }
+
+        if (shpParams) {
+            for (var key in shpParams) {
+                if (Object.prototype.hasOwnProperty.call(shpParams, key)) {
+                    options[key] = shpParams[key];
+                }
+            }
+        }
+
+        return options;
+    }
+
+    function getQrContainer() {
+        return document.getElementById(qrContainerId);
+    }
+
+    function getShowButton() {
+        return document.getElementById(showButtonId);
+    }
+
+    function hideShowButton() {
+        var button = getShowButton();
+
+        if (button) {
+            button.disabled = true;
+            button.style.display = 'none';
+        }
+    }
+
+    function showShowButton() {
+        var button = getShowButton();
+
+        if (button) {
+            button.disabled = false;
+            button.style.display = '';
+        }
+    }
+
+    function clearQrFrameNodes() {
+        var container = getQrContainer();
+
+        if (!container) {
+            return;
+        }
+
+        var nodes = container.querySelectorAll('iframe,canvas,svg,img,table');
+
+        for (var i = 0; i < nodes.length; i++) {
+            nodes[i].remove();
+        }
+    }
+
+    function sizeQrIframe() {
+        var container = getQrContainer();
+
+        if (!container) {
+            return;
+        }
+
+        container.style.minHeight = '{{ qr_container_size }}px';
+
+        var iframe = container.querySelector('iframe');
+
+        if (!iframe) {
+            return;
+        }
+
+        iframe.style.setProperty('display', 'block', 'important');
+        iframe.style.setProperty('width', '{{ qr_container_size }}px', 'important');
+        iframe.style.setProperty('max-width', '100%', 'important');
+        iframe.style.setProperty('height', '{{ qr_container_size }}px', 'important');
+        iframe.style.setProperty('min-height', '{{ qr_container_size }}px', 'important');
+        iframe.style.setProperty('border', '0', 'important');
+        iframe.style.setProperty('margin', '0 auto', 'important');
+    }
+
+    function watchQrIframe() {
+        state[stateKey] = state[stateKey] || {};
+
+        var container = getQrContainer();
+
+        if (!container) {
+            return;
+        }
+
+        if (state[stateKey].qrObserver) {
+            state[stateKey].qrObserver.disconnect();
+        }
+
+        if (window.MutationObserver) {
+            state[stateKey].qrObserver = new MutationObserver(sizeQrIframe);
+            state[stateKey].qrObserver.observe(container, { childList: true, subtree: true });
+        }
+
+        sizeQrIframe();
+    }
+
+    function loadQrLibrary(callback) {
+        if (typeof window.QRCode === 'function') {
+            callback();
+            return;
+        }
+
+        if (state.qrLibraryLoading) {
+            var waitInterval = window.setInterval(function() {
+                if (typeof window.QRCode === 'function') {
+                    window.clearInterval(waitInterval);
+                    callback();
+                }
+            }, 100);
+
+            window.setTimeout(function() {
+                window.clearInterval(waitInterval);
+            }, 5000);
+
+            return;
+        }
+
+        state.qrLibraryLoading = true;
+
+        var script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        script.async = true;
+        script.onload = function() {
+            state.qrLibraryLoading = false;
+            callback();
+        };
+        script.onerror = function() {
+            state.qrLibraryLoading = false;
+        };
+
+        document.head.appendChild(script);
+    }
+
+    function renderPaymentLinkQr(url) {
+        var container = getQrContainer();
+
+        if (!container || !url) {
+            return;
+        }
+
+        if (container.getAttribute('data-payment-link') === url && hasQrMarkup()) {
+            return;
+        }
+
+        loadQrLibrary(function() {
+            if (typeof window.QRCode !== 'function') {
+                return;
+            }
+
+            container.innerHTML = '';
+            container.setAttribute('data-payment-link', url);
+
+            new window.QRCode(container, {
+                text: url,
+                width: {{ qr_container_size }},
+                height: {{ qr_container_size }},
+                correctLevel: window.QRCode.CorrectLevel.M
+            });
+        });
+    }
+
+    function isVisibleQrNode(node) {
+        if (!node) {
+            return false;
+        }
+
+        var rect = node.getBoundingClientRect();
+        var style = window.getComputedStyle(node);
+
+        return rect.width > 20 && rect.height > 20 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    }
+
+    function hasQrMarkup() {
+        var container = getQrContainer();
+
+        if (!container) {
+            return false;
+        }
+
+        var nodes = container.querySelectorAll('iframe,canvas,svg,img,table');
+
+        for (var i = 0; i < nodes.length; i++) {
+            if (isVisibleQrNode(nodes[i])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function resetStalePaymentState() {
+        state[stateKey] = state[stateKey] || {};
+
+        var container = getQrContainer();
+        var containerChanged = state[stateKey].container && state[stateKey].container !== container;
+        var failedRender = (state[stateKey].renderAttempts || 0) > 5;
+
+        if (state[stateKey].started && !state[stateKey].loading && !state[stateKey].paymentLink && !hasQrMarkup() && (containerChanged || failedRender)) {
+            stopPolling();
+            state[stateKey].started = false;
+            state[stateKey].loading = false;
+            state[stateKey].renderAttempts = 0;
+        }
+
+        state[stateKey].container = container;
+    }
+
+    function verifyQrRendered() {
+        window.setTimeout(function() {
+            state[stateKey] = state[stateKey] || {};
+
+            if (state[stateKey].paymentLink) {
+                renderPaymentLinkQr(state[stateKey].paymentLink);
+
+                if (hasQrMarkup()) {
+                    state[stateKey].renderAttempts = 0;
+                    return;
+                }
+
+                state[stateKey].renderAttempts = (state[stateKey].renderAttempts || 0) + 1;
+
+                if (state[stateKey].renderAttempts > 10) {
+                    setStatus({{ text_qr_error_js|raw }});
+                    return;
+                }
+
+                verifyQrRendered();
+                return;
+            }
+
+            if (hasQrMarkup()) {
+                state[stateKey].renderAttempts = 0;
+                return;
+            }
+
+            state[stateKey].renderAttempts = (state[stateKey].renderAttempts || 0) + 1;
+
+            if (state[stateKey].renderAttempts > 5) {
+                setStatus({{ text_qr_error_js|raw }});
+                stopPolling();
+                state[stateKey].started = false;
+                state[stateKey].loading = false;
+                state[stateKey].userRequested = false;
+                clearQrFrameNodes();
+                showShowButton();
+                return;
+            }
+
+            verifyQrRendered();
+        }, 1500);
+    }
+
+    function startPayment() {
+        state[stateKey] = state[stateKey] || {};
+
+        if (!state[stateKey].userRequested) {
+            return;
+        }
+
+        resetStalePaymentState();
+
+        if (state[stateKey].started || state[stateKey].loading) {
+            return;
+        }
+
+        if (!hasStartOp()) {
+            setStatus({{ text_qr_error_js|raw }});
+            state[stateKey].userRequested = false;
+            showShowButton();
+            return;
+        }
+
+        state[stateKey].loading = true;
+        state[stateKey].started = true;
+
+        try {
+            setStatus({{ text_qr_wait_js|raw }});
+            hideShowButton();
+            watchQrIframe();
+            startPolling();
+            window.Robokassa.pay.startOp(buildOptions());
+            sizeQrIframe();
+            window.setTimeout(sizeQrIframe, 50);
+            window.setTimeout(sizeQrIframe, 250);
+            state[stateKey].loading = false;
+            verifyQrRendered();
+        } catch (e) {
+            stopPolling();
+            state[stateKey].loading = false;
+            state[stateKey].started = false;
+            state[stateKey].userRequested = false;
+            setStatus({{ text_qr_error_js|raw }});
+            showShowButton();
+            if (window.console && typeof window.console.error === 'function') {
+                window.console.error('Robokassa SBP startOp failed', e);
+            }
+        }
+    }
+
+    function runWhenReady() {
+        if (document.getElementById(qrContainerId)) {
+            startPayment();
+            return;
+        }
+
+        window.setTimeout(runWhenReady, 100);
+    }
+
+    function ensureScriptAndStart() {
+        if (hasStartOp()) {
+            runWhenReady();
+            return;
+        }
+
+        if (state.merchantScriptLoading) {
+            var waitInterval = window.setInterval(function() {
+                if (hasStartOp()) {
+                    window.clearInterval(waitInterval);
+                    runWhenReady();
+                }
+            }, 100);
+
+            window.setTimeout(function() {
+                window.clearInterval(waitInterval);
+                if (!hasStartOp()) {
+                    state[stateKey] = state[stateKey] || {};
+                    state[stateKey].userRequested = false;
+                    setStatus({{ text_qr_error_js|raw }});
+                    showShowButton();
+                }
+            }, 5000);
+
+            return;
+        }
+
+        state.merchantScriptLoading = true;
+
+        var script = document.createElement('script');
+        script.src = merchantScriptSrc;
+        script.async = true;
+        script.setAttribute('data-robokassa-sbp-bundle', '1');
+        script.onload = function() {
+            state.merchantScriptLoading = false;
+            runWhenReady();
+        };
+        script.onerror = function() {
+            state.merchantScriptLoading = false;
+            state[stateKey] = state[stateKey] || {};
+            state[stateKey].userRequested = false;
+            setStatus({{ text_qr_error_js|raw }});
+            showShowButton();
+        };
+
+        document.head.appendChild(script);
+    }
+
+    function requestQrCode() {
+        state[stateKey] = state[stateKey] || {};
+
+        if (state[stateKey].started || state[stateKey].loading) {
+            return;
+        }
+
+        if (!isCheckoutReadyForQr()) {
+            setStatus({{ text_qr_checkout_not_ready_js|raw }});
+            showShowButton();
+            return;
+        }
+
+        state[stateKey].userRequested = true;
+        state[stateKey].renderAttempts = 0;
+        setStatus({{ text_qr_wait_js|raw }});
+        hideShowButton();
+        ensureScriptAndStart();
+    }
+
+    function initShowButton() {
+        var button = getShowButton();
+
+        if (!button || button.getAttribute('data-robokassa-sbp-bound') === '1') {
+            return;
+        }
+
+        button.setAttribute('data-robokassa-sbp-bound', '1');
+        button.addEventListener('click', requestQrCode);
+    }
+
+    initShowButton();
+})();
+</script>
+{% endif %}
