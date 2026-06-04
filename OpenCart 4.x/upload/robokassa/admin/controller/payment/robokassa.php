@@ -15,7 +15,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $this->load->model('localisation/language');
 
         if ($this->request->server['REQUEST_METHOD'] !== 'POST') {
-            $this->syncExtraPaymentControllers($this->getStoredInstallmentAliases());
+            $this->syncExtraPaymentControllers($this->getStoredInstallmentAliases(), $this->getStoredInstallmentLabels());
         }
 
         if (($this->request->server['REQUEST_METHOD'] === 'POST') && $this->validate()) {
@@ -30,22 +30,25 @@ class Robokassa extends \Opencart\System\Engine\Controller
             $this->saveSettingDirect('payment_robokassa', $this->request->post);
 
             if ($is_update_request || $is_first_sync || $is_login_changed) {
-                $aliases = $this->fetchInstallmentAliases($merchant_login);
+                $methods = $this->fetchInstallmentMethods($merchant_login);
 
-                if ($aliases === false) {
+                if ($methods === false) {
                     $this->session->data['error_warning'] = 'Failed to update Robokassa payment methods. Check Merchant Login and GetCurrencies availability.';
                     $this->response->redirect($this->url->link('extension/robokassa/payment/robokassa', 'user_token=' . $this->session->data['user_token'], true));
 
                     return;
                 }
 
+                $aliases = $methods['aliases'];
+
                 $this->saveSettingDirect('payment_robokassa_methods', [
                     'payment_robokassa_methods_login' => $merchant_login,
                     'payment_robokassa_methods_initialized' => 1,
-                    'payment_robokassa_methods_aliases' => $aliases
+                    'payment_robokassa_methods_aliases' => $aliases,
+                    'payment_robokassa_methods_labels' => $methods['labels']
                 ]);
 
-                $this->syncExtraPaymentControllers($aliases);
+                $this->syncExtraPaymentControllers($aliases, $methods['labels']);
                 $methods_updated = true;
             }
 
@@ -381,6 +384,17 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
     private function fetchInstallmentAliases(string $merchant_login)
     {
+        $methods = $this->fetchInstallmentMethods($merchant_login);
+
+        if ($methods === false) {
+            return false;
+        }
+
+        return $methods['aliases'];
+    }
+
+    private function fetchInstallmentMethods(string $merchant_login)
+    {
         $merchant_login = trim($merchant_login);
 
         if ($merchant_login === '') {
@@ -413,16 +427,46 @@ class Robokassa extends \Opencart\System\Engine\Controller
         }
 
         if (!preg_match_all('/\bAlias="([^"]+)"/i', $currency_xml, $aliases_match)) {
-            return [];
+            return [
+                'aliases' => [],
+                'labels' => []
+            ];
         }
 
         $aliases = [];
+        $labels = [];
+
+        if (preg_match_all('/<Currency\b([^>]*)>/i', $currency_xml, $currency_matches)) {
+            foreach ($currency_matches[1] as $attributes) {
+                if (!preg_match('/\bAlias="([^"]+)"/i', $attributes, $alias_match)) {
+                    continue;
+                }
+
+                if (!preg_match('/\bLabel="([^"]+)"/i', $attributes, $label_match)) {
+                    continue;
+                }
+
+                $alias = strtolower((string)$alias_match[1]);
+                $label = (string)$label_match[1];
+
+                if (!isset($labels[$alias])) {
+                    $labels[$alias] = $label;
+                }
+
+                if ($alias === 'sbp' && strtoupper($label) === 'SBPPSR') {
+                    $labels[$alias] = $label;
+                }
+            }
+        }
 
         foreach ($aliases_match[1] as $alias) {
             $aliases[] = strtolower((string)$alias);
         }
 
-        return array_values(array_unique($aliases));
+        return [
+            'aliases' => array_values(array_unique($aliases)),
+            'labels' => $labels
+        ];
     }
 
     public function install(): void
@@ -432,7 +476,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $this->model_user_user_group->addPermission($this->user->getGroupId(), 'access', $route);
         $this->model_user_user_group->addPermission($this->user->getGroupId(), 'modify', $route);
 
-        $this->syncExtraPaymentControllers($this->getStoredInstallmentAliases());
+        $this->syncExtraPaymentControllers($this->getStoredInstallmentAliases(), $this->getStoredInstallmentLabels());
         $this->registerEvents();
         $this->sendPulseStatusChange('enabled');
     }
@@ -444,11 +488,13 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $this->sendPulseStatusChange('disabled');
     }
 
-    private function syncExtraPaymentControllers(array $aliases): void
+    private function syncExtraPaymentControllers(array $aliases, array $labels = []): void
     {
         $aliases = array_values(array_unique(array_map(static function ($alias): string {
             return strtolower((string)$alias);
         }, $aliases)));
+
+        $labels = array_change_key_case($labels, CASE_LOWER);
 
         $alias_map = [
             'robokassa_credit'       => 'otp',
@@ -462,6 +508,14 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $enabled_codes = [];
 
         foreach ($alias_map as $code => $alias) {
+            if ($code === 'robokassa_sbp') {
+                if (in_array($alias, $aliases, true) && strtoupper((string)($labels[$alias] ?? '')) === 'SBPPSR') {
+                    $enabled_codes[] = $code;
+                }
+
+                continue;
+            }
+
             if (in_array($alias, $aliases, true)) {
                 $enabled_codes[] = $code;
             }
@@ -550,6 +604,20 @@ class Robokassa extends \Opencart\System\Engine\Controller
         return $aliases;
     }
 
+    private function getStoredInstallmentLabels(): array
+    {
+        $methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
+        $current_login = trim((string)$this->config->get('payment_robokassa_login'));
+        $methods_login = trim((string)$this->config->get('payment_robokassa_methods_login'));
+        $labels = $this->config->get('payment_robokassa_methods_labels');
+
+        if (!$methods_initialized || $current_login === '' || $methods_login !== $current_login || !is_array($labels)) {
+            return [];
+        }
+
+        return $labels;
+    }
+
     private function registerEvents(): void
     {
         $this->load->model('setting/event');
@@ -561,6 +629,8 @@ class Robokassa extends \Opencart\System\Engine\Controller
             'robokassa_hold_addhistory_before_pipe',
             'robokassa_product_widget_after_dot',
             'robokassa_product_widget_after_pipe',
+            'robokassa_checkout_bootstrap_after_dot',
+            'robokassa_checkout_bootstrap_after_pipe',
             'robokassa_payment_method_graph_after_dot',
             'robokassa_payment_method_graph_after_pipe',
             'robokassa_admin_payment_extension_after_dot',
@@ -621,12 +691,28 @@ class Robokassa extends \Opencart\System\Engine\Controller
                 'sort_order'  => 5
             ],
             [
+                'code'        => 'robokassa_checkout_bootstrap_after_dot',
+                'description' => 'Robokassa checkout render bootstrap (checkout/checkout after, dot)',
+                'trigger'     => 'catalog/view/checkout/checkout/after',
+                'action'      => 'extension/robokassa/event/robokassa.onCheckoutViewAfter',
+                'status'      => 1,
+                'sort_order'  => 6
+            ],
+            [
+                'code'        => 'robokassa_checkout_bootstrap_after_pipe',
+                'description' => 'Robokassa checkout render bootstrap (checkout|checkout after, pipe)',
+                'trigger'     => 'catalog/view/checkout/checkout/after',
+                'action'      => 'extension/robokassa/event/robokassa|onCheckoutViewAfter',
+                'status'      => 1,
+                'sort_order'  => 7
+            ],
+            [
                 'code'        => 'robokassa_payment_method_graph_after_dot',
                 'description' => 'Robokassa checkout payment graph (checkout/payment_method after, dot)',
                 'trigger'     => 'catalog/view/checkout/payment_method/after',
                 'action'      => 'extension/robokassa/event/robokassa.onPaymentMethodViewAfter',
                 'status'      => 1,
-                'sort_order'  => 6
+                'sort_order'  => 8
             ],
             [
                 'code'        => 'robokassa_payment_method_graph_after_pipe',
@@ -634,7 +720,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
                 'trigger'     => 'catalog/view/checkout/payment_method/after',
                 'action'      => 'extension/robokassa/event/robokassa|onPaymentMethodViewAfter',
                 'status'      => 1,
-                'sort_order'  => 7
+                'sort_order'  => 9
             ],
             [
                 'code'        => 'robokassa_admin_payment_extension_after_dot',
@@ -642,7 +728,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
                 'trigger'     => 'admin/view/extension/payment/after',
                 'action'      => 'extension/robokassa/event/robokassa.onPaymentExtensionViewAfter',
                 'status'      => 1,
-                'sort_order'  => 8
+                'sort_order'  => 10
             ],
             [
                 'code'        => 'robokassa_admin_payment_extension_after_pipe',
@@ -650,7 +736,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
                 'trigger'     => 'admin/view/extension/payment/after',
                 'action'      => 'extension/robokassa/event/robokassa|onPaymentExtensionViewAfter',
                 'status'      => 1,
-                'sort_order'  => 9
+                'sort_order'  => 11
             ],
         ];
 
@@ -670,6 +756,8 @@ class Robokassa extends \Opencart\System\Engine\Controller
             'robokassa_hold_addhistory_before_pipe',
             'robokassa_product_widget_after_dot',
             'robokassa_product_widget_after_pipe',
+            'robokassa_checkout_bootstrap_after_dot',
+            'robokassa_checkout_bootstrap_after_pipe',
             'robokassa_payment_method_graph_after_dot',
             'robokassa_payment_method_graph_after_pipe',
             'robokassa_admin_payment_extension_after_dot',

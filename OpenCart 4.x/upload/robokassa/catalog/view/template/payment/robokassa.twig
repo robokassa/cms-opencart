@@ -1,5 +1,39 @@
 {% if inc_curr_label %}
     <script type="text/javascript" src="https://auth.robokassa.ru/Merchant/PaymentForm/DirectPayment.js"></script>
+    {% if graph_config_json != 'null' %}
+        <script type="text/javascript">
+        (function() {
+            var config = {{ graph_config_json|raw }};
+
+            if (!config) {
+                return;
+            }
+
+            var node = document.getElementById('robokassa-checkout-graph-config');
+
+            if (!node) {
+                node = document.createElement('div');
+                node.id = 'robokassa-checkout-graph-config';
+                node.hidden = true;
+                document.body.appendChild(node);
+            }
+
+            node.setAttribute('data-config', JSON.stringify(config));
+
+            var legacyContainer = document.getElementById('robokassa-confirm-graph-container');
+
+            if (legacyContainer && legacyContainer.parentNode) {
+                legacyContainer.parentNode.removeChild(legacyContainer);
+            }
+
+            if (typeof window.robokassaCheckoutGraphScan === 'function') {
+                window.robokassaCheckoutGraphScan();
+            } else if (typeof Event === 'function') {
+                document.dispatchEvent(new Event('robokassa:checkout-graph-config'));
+            }
+        })();
+        </script>
+    {% endif %}
     <div class="buttons">
         <div class="pull-right">
             <input type="button" value="{{ button_confirm }}" class="btn btn-primary"
