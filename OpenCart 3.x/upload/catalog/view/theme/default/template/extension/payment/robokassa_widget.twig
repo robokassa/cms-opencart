@@ -62,7 +62,7 @@
 		return true;
 	};
 
-	document.addEventListener('DOMContentLoaded', function () {
+	function initRobokassaProductWidget() {
 		var container = document.getElementById('robokassa-product-widget');
 		if (!container) {
 			return;
@@ -406,7 +406,13 @@
 			updateCheckoutUrls();
 			scheduleUpdate();
 		}, true);
-	});
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', initRobokassaProductWidget);
+	} else {
+		initRobokassaProductWidget();
+	}
 </script>
 
 <style>
