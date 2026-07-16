@@ -36,8 +36,6 @@
     <operation>
       <search regex="true"><![CDATA[~\$data\['review_status'\]\s*=\s*\$this->config->get\('config_review_status'\);~]]></search>
       <add position="before"><![CDATA[
-        $data['robokassa_widget'] = '';
-
         if ($this->config->get('payment_robokassa_country') == 'RUB') {
           if ($this->customer->isLogged() || !$this->config->get('config_customer_price')) {
             if ((float)$product_info['special']) {
@@ -47,22 +45,33 @@
             }
 
             if ($robokassa_widget_amount > 0) {
-              $data['robokassa_widget'] = $this->load->controller('extension/payment/robokassa_widget', array(
+              $robokassa_widget_preview = $this->load->controller('extension/payment/robokassa_widget', array(
                 'product_id' => $product_id,
                 'quantity' => isset($this->request->get['quantity']) ? (int)$this->request->get['quantity'] : $data['minimum']
               ));
+
+              if ($robokassa_widget_preview !== '') {
+                $this->document->addScript('catalog/view/javascript/robokassa_product_widget_mount.js', 'footer');
+              }
             }
           }
         }
       ]]></add>
     </operation>
   </file>
-  <file path="catalog/view/theme/*/template/product/product.twig">
+  <file path="catalog/controller/common/footer.php">
     <operation>
-      <search><![CDATA[<div id="product">]]></search>
-      <add position="before"><![CDATA[
-        {{ robokassa_widget }}
+      <search><![CDATA[$data['scripts'] = $this->document->getScripts('footer');]]></search>
+      <add position="after"><![CDATA[
+        $robokassa_route = isset($this->request->get['route']) ? (string)$this->request->get['route'] : '';
+        $data['robokassa_checkout_graph_script'] = (strpos($robokassa_route, 'checkout') !== false) ? 'catalog/view/javascript/robokassa_checkout_graph.js' : '';
       ]]></add>
+    </operation>
+  </file>
+  <file path="catalog/view/theme/*/template/common/footer.twig">
+    <operation>
+      <search><![CDATA[</body>]]></search>
+      <add position="before"><![CDATA[{% if robokassa_checkout_graph_script %}<script src="{{ robokassa_checkout_graph_script }}" type="text/javascript"></script>{% endif %}]]></add>
     </operation>
   </file>
   <file path="catalog/controller/checkout/payment_method.php">
@@ -143,12 +152,8 @@
               var radioInput = radioWrapper ? radioWrapper.querySelector('input[name="payment_method"]') : null;
               var isActive = !!(radioInput && radioInput.checked);
 
-              if (radioWrapper) {
-                if (isActive) {
-                  radioWrapper.classList.add('robokassa-checkout-payment--active');
-                } else {
-                  radioWrapper.classList.remove('robokassa-checkout-payment--active');
-                }
+              if (radioWrapper && radioWrapper.parentNode) {
+                radioWrapper.parentNode.classList.add('robokassa-checkout-payment-list');
               }
 
               if (isActive) {
@@ -180,8 +185,78 @@
             }
           }
 
+          function normalizeRobokassaCheckoutAgree() {
+            var agrees = document.querySelectorAll('input[name="agree"]');
+
+            for (var i = 0; i < agrees.length; i++) {
+              var agree = agrees[i];
+              var label = agree.closest ? agree.closest('label') : null;
+              var holder = agree.closest ? agree.closest('.checkbox, .form-check') : null;
+              var buttons = agree.closest ? agree.closest('.buttons') : null;
+              var row = agree.closest ? agree.closest('.pull-right') : null;
+              var scope = row || holder || agree.parentNode;
+
+              if (label) {
+                label.classList.add('robokassa-checkout-agree');
+              }
+
+              if (holder) {
+                holder.classList.add('robokassa-checkout-agree-holder');
+              }
+
+              if (buttons) {
+                buttons.classList.add('robokassa-checkout-buttons');
+              }
+
+              if (row) {
+                row.classList.add('robokassa-checkout-buttons-row');
+              }
+
+              if (!label && scope && scope.getAttribute('data-robokassa-agree-normalized') !== '1') {
+                scope.setAttribute('data-robokassa-agree-normalized', '1');
+
+                var line = document.createElement('label');
+                var text = document.createElement('span');
+                var button = scope.querySelector('#button-payment-method, input[type="button"], button, input[type="submit"]');
+                var nodes = Array.prototype.slice.call(scope.childNodes);
+
+                line.className = 'robokassa-checkout-agree';
+                text.className = 'robokassa-checkout-agree-text';
+
+                scope.insertBefore(line, button && button.parentNode === scope ? button : scope.firstChild);
+                line.appendChild(agree);
+                line.appendChild(text);
+
+                for (var j = 0; j < nodes.length; j++) {
+                  var node = nodes[j];
+
+                  if (node === line || node === agree || node === button) {
+                    continue;
+                  }
+
+                  if (node.nodeType === 1) {
+                    var tagName = node.tagName ? node.tagName.toLowerCase() : '';
+
+                    if (tagName === 'script' || tagName === 'style') {
+                      continue;
+                    }
+
+                    if (button && node.contains && node.contains(button)) {
+                      continue;
+                    }
+                  }
+
+                  text.appendChild(node);
+                }
+              }
+            }
+          }
+
+          normalizeRobokassaCheckoutAgree();
+
           function initRobokassaCheckoutGraphs() {
             bindRobokassaCheckoutGraphs();
+            normalizeRobokassaCheckoutAgree();
             syncRobokassaCheckoutGraphs();
           }
 
@@ -221,18 +296,86 @@
         })();
         </script>
         <style>
-         .robokassa-checkout-payment--active {
-           padding: 12px 14px 14px;
-           border: 1px solid #2f2f2f;
-           border-radius: 8px;
-           margin: 0 0 12px;
-           box-sizing: border-box;
-           overflow: visible;
+         .robokassa-checkout-payment-list {
+           display: block !important;
+           width: 100%;
+           max-width: 100%;
          }
 
-         .robokassa-checkout-payment--active > label {
-           display: block;
-           margin-bottom: 10px;
+         .robokassa-checkout-payment-list > .radio,
+         .robokassa-checkout-payment-list > label,
+         .robokassa-checkout-payment-list > .payment-method,
+         .robokassa-checkout-payment-list > .payment-method-item,
+         .robokassa-checkout-payment-list > .checkout-payment-method,
+         .robokassa-checkout-payment-list > .payment-option {
+           display: block !important;
+           float: none !important;
+           width: 100% !important;
+           max-width: 100% !important;
+           margin: 0 0 8px !important;
+           clear: both;
+           box-sizing: border-box;
+         }
+
+         .robokassa-checkout-payment-list input[name="payment_method"] {
+           margin-right: 6px;
+         }
+
+         .robokassa-checkout-buttons {
+           width: 100%;
+           max-width: 100%;
+           text-align: left;
+         }
+
+         .robokassa-checkout-buttons .pull-right {
+           float: none !important;
+           width: 100%;
+           max-width: 100%;
+           text-align: left !important;
+         }
+
+         .robokassa-checkout-buttons-row {
+           float: none !important;
+           width: 100%;
+           max-width: 100%;
+           text-align: left !important;
+         }
+
+         .robokassa-checkout-agree-holder {
+           width: 100%;
+           max-width: 100%;
+           text-align: left !important;
+         }
+
+         .robokassa-checkout-agree {
+           display: flex !important;
+           align-items: flex-start !important;
+           gap: 6px;
+           width: 100% !important;
+           max-width: 100% !important;
+           margin: 0 0 14px !important;
+           text-align: left !important;
+           line-height: 1.4 !important;
+           white-space: normal !important;
+         }
+
+         .robokassa-checkout-agree input[name="agree"] {
+           flex: 0 0 auto;
+           margin: 2px 0 0 !important;
+           position: static !important;
+           vertical-align: middle !important;
+         }
+
+         .robokassa-checkout-agree-text {
+           display: block !important;
+           min-width: 0;
+           max-width: 100%;
+           line-height: 1.4 !important;
+           white-space: normal !important;
+         }
+
+         .robokassa-checkout-agree a {
+           display: inline !important;
          }
 
          .robokassa-checkout-graph {

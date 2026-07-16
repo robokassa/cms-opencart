@@ -119,6 +119,49 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
         return (float)$this->tax->calculate($price, $product_info['tax_class_id'], $this->config->get('config_tax'));
     }
 
+    private function getCheckoutGraphMethods()
+    {
+        return array(
+            'robokassa_mokka' => 'Mokka',
+            'robokassa_podeli' => 'Podeli',
+            'robokassa_yandex_split' => 'YandexPaySplit'
+        );
+    }
+
+    private function getCartTotalAmount()
+    {
+        $totals = array();
+        $taxes = $this->cart->getTaxes();
+        $total = 0;
+
+        $total_data = array(
+            'totals' => &$totals,
+            'taxes' => &$taxes,
+            'total' => &$total
+        );
+
+        $this->load->model('setting/extension');
+
+        $sort_order = array();
+        $results = $this->model_setting_extension->getExtensions('total');
+
+        foreach ($results as $key => $value) {
+            $sort_order[$key] = $this->config->get('total_' . $value['code'] . '_sort_order');
+        }
+
+        array_multisort($sort_order, SORT_ASC, $results);
+
+        foreach ($results as $result) {
+            if ($this->config->get('total_' . $result['code'] . '_status')) {
+                $this->load->model('extension/total/' . $result['code']);
+
+                $this->{'model_extension_total_' . $result['code']}->getTotal($total_data);
+            }
+        }
+
+        return (float)$total;
+    }
+
     private function getCustomerEmail()
     {
         if ($this->customer->isLogged() && method_exists($this->customer, 'getEmail')) {
@@ -380,6 +423,44 @@ class ControllerExtensionPaymentRobokassaWidget extends Controller
             'email' => $widget_data['email'],
             'show_bnpl' => $widget_data['show_bnpl'],
             'show_credit' => $widget_data['show_credit']
+        )));
+    }
+
+    public function graph()
+    {
+        $merchant_login = trim((string)$this->config->get('payment_robokassa_login'));
+        $total = $this->getCartTotalAmount();
+        $enabled = $this->config->get('payment_robokassa_status')
+            && $this->config->get('payment_robokassa_country') == 'RUB'
+            && $merchant_login !== ''
+            && $total > 0;
+
+        $this->response->addHeader('Content-Type: application/json');
+
+        if (!$enabled) {
+            $this->response->setOutput(json_encode(array('success' => false)));
+
+            return;
+        }
+
+        $this->response->setOutput(json_encode(array(
+            'success' => true,
+            'merchant_login' => $merchant_login,
+            'out_sum' => number_format((float)$total, 2, '.', ''),
+            'methods' => $this->getCheckoutGraphMethods(),
+            'script' => 'https://auth.robokassa.ru/merchant/bundle/robokassa-iframe-badge.js'
+        )));
+    }
+
+    public function html()
+    {
+        $product_id = (int)$this->getRequestValue($this->request->get, array('product_id'));
+        $quantity = (int)$this->getRequestValue($this->request->get, array('quantity'), 1);
+
+        $this->response->addHeader('Content-Type: text/html; charset=utf-8');
+        $this->response->setOutput($this->index(array(
+            'product_id' => $product_id,
+            'quantity' => $quantity > 0 ? $quantity : 1
         )));
     }
 
