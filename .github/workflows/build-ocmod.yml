@@ -1,75 +1,71 @@
 name: Build OCMOD ZIP and Create Release
 
 on:
-  push:
-    branches:
-      - master  # Этот процесс будет запускаться при пуше в ветку main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: opencart-release
+  cancel-in-progress: false
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest  # Используем Ubuntu для сборки
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3  # Проверка вашего репозитория
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    # Шаг для удаления старых релизов
-    - name: Delete old releases
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/releases \
-        | jq -r '.[] | select(.draft == false) | .id' \
-        | while read id; do
-            echo "Deleting release with ID: $id"
-            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/releases/$id
-          done
+      - name: Read extension versions
+        id: versions
+        shell: bash
+        run: |
+          OC3_VERSION="$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' 'OpenCart 3.x/install.xml')"
+          OC4_VERSION="$(jq -r '.version' 'OpenCart 4.x/upload/robokassa/install.json')"
 
-    # Шаг для создания релиза для OpenCart 3.x
-    - name: Create OCMOD ZIP for OpenCart 3.x
-      run: |
-        mkdir -p release/opencart-3
-        cd "OpenCart 3.x"  # Переходим в папку OpenCart 3.x
-        zip -r ../release/opencart-3/robokassa3.ocmod.zip *  # Архивируем содержимое OpenCart 3.x без промежуточной папки
+          test -n "$OC3_VERSION"
+          test -n "$OC4_VERSION"
+          test "$OC4_VERSION" != "null"
 
-    - name: Generate Tag for OpenCart 3.x
-      id: tag-oc3
-      run: |
-        TAG="OpenCart-3.x-$(date +'%d.%m.%y-%H%M')"
-        echo "Generated tag for OpenCart 3.x: $TAG"
-        echo "TAG_OC3=$TAG" >> $GITHUB_ENV
+          echo "oc3=$OC3_VERSION" >> "$GITHUB_OUTPUT"
+          echo "oc4=$OC4_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=opencart-oc3-v${OC3_VERSION}-oc4-v${OC4_VERSION}" >> "$GITHUB_OUTPUT"
 
-    - name: Create GitHub Release for OpenCart 3.x
-      id: release-oc3
-      uses: softprops/action-gh-release@v1
-      with:
-        files: release/opencart-3/robokassa3.ocmod.zip  # Указываем путь к архиву OpenCart 3.x
-        tag_name: ${{ env.TAG_OC3 }}  # Используем сгенерированный тег для OpenCart 3.x
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Токен для аутентификации на GitHub
+      - name: Ensure release tag is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.versions.outputs.tag }}
+        shell: bash
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" > /dev/null 2>&1; then
+            echo "::error::Tag ${RELEASE_TAG} already exists. Increase the extension version before publishing."
+            exit 1
+          fi
 
-    # Шаг для создания релиза для OpenCart 4.x
-    - name: Create OCMOD ZIP for OpenCart 4.x
-      run: |
-       mkdir -p release/opencart-4/temp  # Создаем временную папку
-       cp -r OpenCart\ 4.x/upload/robokassa/* release/opencart-4/temp/  # Копируем содержимое robokassa во временную папку
-       cd release/opencart-4/temp  # Переходим в временную папку
-       zip -r ../robokassa.ocmod.zip .  # Архивируем содержимое временной папки
-       cd ../..  # Возвращаемся в корневую директорию
-       rm -rf release/opencart-4/temp  # Удаляем временную папку
+      - name: Build OpenCart 3 archive
+        shell: bash
+        run: |
+          mkdir -p release/opencart-3
+          cd 'OpenCart 3.x'
+          zip -r ../release/opencart-3/robokassa3.ocmod.zip upload install.xml README.md -x '*.DS_Store'
 
-    - name: Generate Tag for OpenCart 4.x
-      id: tag-oc4
-      run: |
-        TAG="OpenCart-4.x-$(date +'%d.%m.%y-%H%M')"
-        echo "Generated tag for OpenCart 4.x: $TAG"
-        echo "TAG_OC4=$TAG" >> $GITHUB_ENV
+      - name: Build OpenCart 4 archive
+        shell: bash
+        run: |
+          mkdir -p release/opencart-4
+          cd 'OpenCart 4.x/upload/robokassa'
+          zip -r ../../../release/opencart-4/robokassa.ocmod.zip admin catalog system install.json README.md -x '*.DS_Store'
 
-    - name: Create GitHub Release for OpenCart 4.x
-      id: release-oc4
-      uses: softprops/action-gh-release@v1
-      with:
-        files: release/opencart-4/robokassa.ocmod.zip  # Указываем путь к архиву OpenCart 4.x
-        tag_name: ${{ env.TAG_OC4 }}  # Используем сгенерированный тег для OpenCart 4.x
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Токен для аутентификации на GitHub
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.versions.outputs.tag }}
+          name: Robokassa for OpenCart — OC3 v${{ steps.versions.outputs.oc3 }} / OC4 v${{ steps.versions.outputs.oc4 }}
+          generate_release_notes: true
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: |
+            release/opencart-3/robokassa3.ocmod.zip
+            release/opencart-4/robokassa.ocmod.zip
