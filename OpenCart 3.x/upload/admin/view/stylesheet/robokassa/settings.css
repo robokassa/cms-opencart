@@ -63,12 +63,13 @@ input:checked + .robokassa-switch:after { transform: translateX(20px); }
 .robokassa-field.is-hidden { display: none; }
 
 .robokassa-url-list { display: grid; gap: 10px; }
-.robokassa-url-list > div { align-items: center; background: #f8fafc; border: 1px solid var(--rk-line); border-radius: 11px; display: grid; gap: 12px; grid-template-columns: 130px 1fr 38px; padding: 10px 12px; }
+.robokassa-url-list > div { align-items: center; background: #f8fafc; border: 1px solid var(--rk-line); border-radius: 11px; display: grid; gap: 12px; grid-template-columns: 130px 1fr auto; padding: 10px 12px; }
 .robokassa-url-list span { color: #344054; font-weight: 600; }
 .robokassa-url-list small { color: var(--rk-muted); font-weight: 500; margin-left: 5px; }
 .robokassa-url-list code { background: transparent; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.robokassa-url-list button { background: #fff; border: 1px solid var(--rk-line); border-radius: 8px; height: 34px; }
+.robokassa-url-list button { background: #fff; border: 1px solid var(--rk-line); border-radius: 8px; height: 34px; width: 34px; }
 .robokassa-url-list button.is-copied { background: #e9f8f1; border-color: #b7ead3; color: var(--rk-success); }
+.robokassa-url-actions { display: flex; gap: 8px; }
 
 .robokassa-method-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .robokassa-method-card { align-items: center; border: 1px solid var(--rk-line); border-radius: 15px; display: grid; gap: 14px; grid-template-columns: 46px 1fr auto; padding: 17px; transition: .18s ease; }
@@ -103,7 +104,7 @@ input:checked + .robokassa-switch:after { transform: translateX(20px); }
   .robokassa-hero__brand { align-items: flex-start; flex-direction: column; }
   .robokassa-nav { grid-template-columns: 1fr; }
   .robokassa-form-grid, .robokassa-form-grid--single { grid-template-columns: 1fr; }
-  .robokassa-url-list > div { grid-template-columns: 1fr 38px; }
+  .robokassa-url-list > div { grid-template-columns: 1fr auto; }
   .robokassa-url-list > div > span { grid-column: 1 / -1; }
   .robokassa-language-grid { grid-template-columns: 1fr; }
 }

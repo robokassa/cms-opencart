@@ -75,6 +75,58 @@
       });
     });
 
+    $('[data-copy-url]').on('click', function () {
+      var button = this;
+      var $button = $(button);
+
+      $button.prop('disabled', true);
+      $.ajax({ url: $button.data('copy-url'), dataType: 'json', cache: false })
+        .done(function (json) {
+          if (!json || !json.success || !json.url) {
+            window.alert((json && json.error) || 'Не удалось получить cron URL.');
+            return;
+          }
+
+          copyText(json.url, function () {
+            $button.addClass('is-copied').html('<i class="fa fa-check"></i>');
+            window.setTimeout(function () {
+              $button.removeClass('is-copied').html('<i class="fa fa-copy"></i>');
+            }, 1400);
+          });
+        })
+        .fail(function () { window.alert('Не удалось получить cron URL.'); })
+        .always(function () { $button.prop('disabled', false); });
+    });
+
+    $('[data-regenerate-url]').on('click', function () {
+      var button = this;
+      var $button = $(button);
+
+      if (!window.confirm($button.data('confirm'))) {
+        return;
+      }
+
+      $button.prop('disabled', true);
+      $.ajax({ url: $button.data('regenerate-url'), type: 'POST', dataType: 'json', cache: false })
+        .done(function (json) {
+          if (!json || !json.success || !json.url) {
+            window.alert((json && json.error) || 'Не удалось создать новый cron-токен.');
+            return;
+          }
+
+          $('#robokassa-refund-cron-url').text(json.display);
+          copyText(json.url, function () {
+            $button.addClass('is-copied').html('<i class="fa fa-check"></i>');
+            window.alert('Новый cron URL скопирован. Обновите его в cron-задаче.');
+            window.setTimeout(function () {
+              $button.removeClass('is-copied').html('<i class="fa fa-refresh"></i>');
+            }, 1400);
+          });
+        })
+        .fail(function () { window.alert('Не удалось создать новый cron-токен.'); })
+        .always(function () { $button.prop('disabled', false); });
+    });
+
     $('.robokassa-toggle input[type="checkbox"]').on('change', function () {
       $(this).closest('.robokassa-method-card').toggleClass('is-enabled', this.checked);
     });

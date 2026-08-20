@@ -248,7 +248,7 @@
         </section>
         <section class="robokassa-card robokassa-card--compact">
           <div class="robokassa-card__header"><div><h3>Автоматическая проверка возвратов</h3><p>Добавьте этот URL в cron с интервалом около 5 минут.</p></div></div>
-          <div class="robokassa-url-list"><div><span>Refund cron <small>GET</small></span><code id="robokassa-refund-cron-url">{{ payment_robokassa_refund_cron_url }}</code><button type="button" data-copy-target="robokassa-refund-cron-url"><i class="fa fa-copy"></i></button></div></div>
+          <div class="robokassa-url-list"><div><span>Refund cron <small>GET</small></span><code id="robokassa-refund-cron-url">{{ payment_robokassa_refund_cron_url }}</code><div class="robokassa-url-actions"><button type="button" data-copy-url="{{ payment_robokassa_refund_cron_copy_url }}" title="Скопировать полный URL"><i class="fa fa-copy"></i></button><button type="button" data-regenerate-url="{{ payment_robokassa_refund_cron_regenerate_url }}" data-confirm="Старый cron URL перестанет работать. Новый URL будет скопирован — не забудьте обновить cron. Продолжить?" title="Создать новый токен"><i class="fa fa-refresh"></i></button></div></div></div>
         </section>
       </div>
 

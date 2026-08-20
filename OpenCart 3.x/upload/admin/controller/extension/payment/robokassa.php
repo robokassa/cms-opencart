@@ -21,8 +21,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         if ($refund_cron_token === '') {
             $refund_cron_token = $this->generateRefundCronToken();
-            $this->model_setting_setting->editSettingValue('payment_robokassa', 'payment_robokassa_refund_cron_token', $refund_cron_token);
-            $this->config->set('payment_robokassa_refund_cron_token', $refund_cron_token);
+            $this->saveRefundCronToken($refund_cron_token);
         }
 
         $this->document->addStyle('view/stylesheet/robokassa/settings.css');
@@ -222,10 +221,9 @@ class ControllerExtensionPaymentRobokassa extends Controller
             $data['payment_robokassa_fail_url'] = HTTP_CATALOG . 'index.php?route=extension/payment/robokassa/fail';
         }
 
-        $refund_cron_base_url = (!empty($_SERVER['HTTPS']) && 'off' !== strtolower($_SERVER['HTTPS']))
-            ? 'https://' . $_SERVER['SERVER_NAME'] . '/'
-            : HTTP_CATALOG;
-        $data['payment_robokassa_refund_cron_url'] = $refund_cron_base_url . 'index.php?route=extension/payment/robokassa/refundCron&token=' . rawurlencode($refund_cron_token);
+        $data['payment_robokassa_refund_cron_url'] = $this->maskRefundCronUrl($this->getRefundCronUrl($refund_cron_token));
+        $data['payment_robokassa_refund_cron_copy_url'] = $this->url->link('extension/payment/robokassa/copyRefundCronUrl', 'user_token=' . $this->session->data['user_token'], true);
+        $data['payment_robokassa_refund_cron_regenerate_url'] = $this->url->link('extension/payment/robokassa/regenerateRefundCronToken', 'user_token=' . $this->session->data['user_token'], true);
 
         if (isset($this->request->post['payment_robokassa_test'])) {
             $data['payment_robokassa_test'] = $this->request->post['payment_robokassa_test'];
@@ -540,6 +538,72 @@ class ControllerExtensionPaymentRobokassa extends Controller
         }
 
         return hash('sha256', uniqid((string)mt_rand(), true));
+    }
+
+    private function saveRefundCronToken($token)
+    {
+        $this->db->query("DELETE FROM `" . DB_PREFIX . "setting` WHERE `store_id` = '0' AND `key` = 'payment_robokassa_refund_cron_token'");
+        $this->db->query("INSERT INTO `" . DB_PREFIX . "setting` SET `store_id` = '0', `code` = 'payment_robokassa', `key` = 'payment_robokassa_refund_cron_token', `value` = '" . $this->db->escape($token) . "', `serialized` = '0'");
+        $this->config->set('payment_robokassa_refund_cron_token', $token);
+    }
+
+    private function getRefundCronUrl($token)
+    {
+        return HTTP_CATALOG . 'index.php?route=extension/payment/robokassa/refundCron&token=' . rawurlencode($token);
+    }
+
+    private function maskRefundCronUrl($url)
+    {
+        return preg_replace('/([?&]token=)[^&]*/', '$1••••••••••••', $url);
+    }
+
+    public function copyRefundCronUrl()
+    {
+        $this->load->language('extension/payment/robokassa');
+        $json = array();
+
+        if (!$this->user->hasPermission('access', 'extension/payment/robokassa')) {
+            $this->response->addHeader('HTTP/1.1 403 Forbidden');
+            $json['error'] = 'Недостаточно прав для просмотра cron URL.';
+        } else {
+            $token = (string)$this->config->get('payment_robokassa_refund_cron_token');
+
+            if ($token === '') {
+                $token = $this->generateRefundCronToken();
+                $this->saveRefundCronToken($token);
+            }
+
+            $json['success'] = true;
+            $json['url'] = $this->getRefundCronUrl($token);
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->addHeader('Cache-Control: no-store, no-cache, must-revalidate');
+        $this->response->setOutput(json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    public function regenerateRefundCronToken()
+    {
+        $json = array();
+
+        if ($this->request->server['REQUEST_METHOD'] !== 'POST') {
+            $this->response->addHeader('HTTP/1.1 405 Method Not Allowed');
+            $json['error'] = 'Метод не поддерживается.';
+        } elseif (!$this->user->hasPermission('modify', 'extension/payment/robokassa')) {
+            $this->response->addHeader('HTTP/1.1 403 Forbidden');
+            $json['error'] = 'Недостаточно прав для обновления cron-токена.';
+        } else {
+            $token = $this->generateRefundCronToken();
+            $this->saveRefundCronToken($token);
+            $url = $this->getRefundCronUrl($token);
+            $json['success'] = true;
+            $json['url'] = $url;
+            $json['display'] = $this->maskRefundCronUrl($url);
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->addHeader('Cache-Control: no-store, no-cache, must-revalidate');
+        $this->response->setOutput(json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     private function installPaymentExtensions()
