@@ -1,372 +1,251 @@
 {{ header }}{{ column_left }}
-<div id="content">
-	<div class="page-header">
-		<div class="container-fluid">
-			<div class="float-end">
-				<button type="submit" form="form-payment" data-bs-toggle="tooltip" title="{{ button_save }}" class="btn btn-primary"><i class="fas fa-save"></i></button>
-				{% if show_update_methods %}
-					<button type="submit" form="form-payment" name="robokassa_action" value="update_methods" data-bs-toggle="tooltip" title="{{ button_update_methods }}" class="btn btn-info"><i class="fas fa-sync-alt"></i></button>
-				{% endif %}
-				<a href="{{ back }}" data-bs-toggle="tooltip" title="{{ button_back }}" class="btn btn-light"><i class="fas fa-reply"></i></a>
-			</div>
-			<h1>{{ heading_title }}</h1>
-			<ul class="breadcrumb">
-				{% for breadcrumb in breadcrumbs %}
-				<li class="breadcrumb-item"><a href="{{ breadcrumb['href'] }}">{{ breadcrumb['text'] }}</a></li>
-				{% endfor %}
-			</ul>
-		</div>
-	</div>
-	<div class="container-fluid">
-		{% if success %}
-			<div class="alert alert-success">
-				<i class="fa fa-check-circle"></i> {{ success }}
-				<button type="button" class="btn-close float-end" data-bs-dismiss="alert" aria-label="Close"></button>
-			</div>
-		{% endif %}
-		{% if error_warning %}
-			<div class="alert alert-danger">
-				<i class="fa fa-exclamation-circle"></i> {{ error_warning }}
-				<button type="button" class="btn-close float-end" data-bs-dismiss="alert" aria-label="Close"></button>
-			</div>
-		{% endif %}
-		<div class="panel panel-default">
-			<div class="panel-heading">
-				<h3 class="panel-title">
-					<i class="fa fa-pencil"></i> {{ text_edit }}
-				</h3>
-			</div>
-			<div class="panel-body">
-				<form action="{{ action }}" method="post" enctype="multipart/form-data" id="form-payment" class="form-horizontal">
-					<div class="form-group required">
-						<label class="col-sm-2 control-label" for="input-merch-login">{{ entry_merch_login }}</label>
-						<div class="col-sm-10">
-							<input type="text" name="payment_robokassa_login" value="{{ payment_robokassa_login }}" placeholder="{{ entry_merch_login }}" id="input-merch-login" class="form-control" />
-							{% if error_merch_login %}
-								<div class="text-danger">{{ error_merch_login }}</div>
-							{% endif %}
-						</div>
-					</div>
-					<div class="form-group required">
-						<label class="col-sm-2 control-label" for="input-password_1">{{ entry_password1 }}</label>
-						<div class="col-sm-10">
-							<input type="password" name="payment_robokassa_password_1" value="{{ payment_robokassa_password_1 }}" placeholder="{{ entry_password1 }}" id="input-password_1" class="form-control" />
-							{% if error_password1 %}
-								<div class="text-danger">{{ error_password1 }}</div>
-							{% endif %}
-						</div>
-					</div>
-					<div class="form-group required">
-						<label class="col-sm-2 control-label" for="input-password_2">{{ entry_password2 }}</label>
-						<div class="col-sm-10">
-							<input type="password" name="payment_robokassa_password_2" value="{{ payment_robokassa_password_2 }}" placeholder="{{ entry_password2 }}" id="input-password_2" class="form-control" />
-							{% if error_password2 %}
-								<div class="text-danger">{{ error_password2 }}</div>
-							{% endif %}
-						</div>
-					</div>
+<link href="/extension/robokassa/admin/view/stylesheet/robokassa/settings.css" rel="stylesheet" type="text/css">
+<div id="content" class="robokassa-settings">
+  <div class="page-header robokassa-page-header">
+    <div class="container-fluid">
+      <div class="float-end robokassa-header-actions">
+        {% if show_update_methods %}
+          <button type="submit" form="form-payment" name="robokassa_action" value="update_methods" class="btn btn-light">
+            <i class="fas fa-sync-alt"></i> {{ button_update_methods }}
+          </button>
+        {% endif %}
+        <button type="submit" form="form-payment" class="btn btn-primary">
+          <i class="fas fa-save"></i> {{ button_save }}
+        </button>
+        <a href="{{ back }}" class="btn btn-light" data-bs-toggle="tooltip" title="{{ button_back }}">
+          <i class="fas fa-reply"></i>
+        </a>
+      </div>
+      <h1>{{ heading_title }}</h1>
+      <ul class="breadcrumb">
+        {% for breadcrumb in breadcrumbs %}
+          <li class="breadcrumb-item"><a href="{{ breadcrumb.href }}">{{ breadcrumb.text }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
 
-					<div class="form-group">
-						<label class="col-sm-2 control-label" for="input-test_password_1">{{ entry_test_password1 }}</label>
-						<div class="col-sm-10">
-							<input type="password" name="payment_robokassa_test_password_1" value="{{ payment_robokassa_test_password_1 }}" placeholder="{{ entry_test_password1 }}" id="input-test_password_1" class="form-control" />
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label" for="input-test_password_2">{{ entry_test_password2 }}</label>
-						<div class="col-sm-10">
-							<input type="password" name="payment_robokassa_test_password_2" value="{{ payment_robokassa_test_password_2 }}" placeholder="{{ entry_test_password2 }}" id="input-test_password_2" class="form-control" />
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label">{{ entry_result_url }}</label>
-						<div class="col-sm-10">
-							<div class="form-control">{{ payment_robokassa_result_url }}</div>
-							<div class="form-text text-muted">Method: {{ payment_robokassa_result_method }}</div>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label">{{ entry_success_url }}</label>
-						<div class="col-sm-10">
-							<div class="form-control">{{ payment_robokassa_success_url }}</div>
-							<div class="form-text text-muted">Method: {{ payment_robokassa_success_method }}</div>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label">{{ entry_fail_url }}</label>
-						<div class="col-sm-10">
-							<div class="form-control">{{ payment_robokassa_fail_url }}</div>
-							<div class="form-text text-muted">Method: {{ payment_robokassa_fail_method }}</div>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label"
-						       for="input-status_id">{{ entry_order_status }}</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_order_status_id" id="input-status_id" class="form-control">
-								{% for order_status in order_statuses %}
-									{% if order_status.order_status_id == payment_robokassa_order_status_id %}
-										<option value="{{ order_status.order_status_id }}" selected="selected">{{ order_status.name }}</option>
-									{% else %}
-										<option value="{{ order_status.order_status_id }}">{{ order_status.name }}</option>
-									{% endif %}
-								{% endfor %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label"
-						       for="input-order-test">{{ entry_test }}</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_test" id="input-test" class="form-control">
-								{% if payment_robokassa_test %}
-									<option value="1" selected="selected">{{ text_yes }}</option>
-									<option value="0">{{ text_no }}</option>
-								{% else %}
-									<option value="1">{{ text_yes }}</option>
-									<option value="0" selected="selected">{{ text_no }}</option>
-								{% endif %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label" for="input-order-country">
-							{{ entry_country }}
-						</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_country" id="input-country" class="form-control">
-								{% if payment_robokassa_country == 'RUB' %}
-									<option value="RUB" selected="selected">{{ text_ru }}</option>
-									<option value="KZT">{{ text_kz }}</option>
-								{% elseif payment_robokassa_country == 'KZT' %}
-									<option value="RUB">{{ text_ru }}</option>
-									<option value="KZT" selected="selected">{{ text_kz }}</option>
-								{% endif %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label" for="input-order-fiscal">
-							<span data-toggle="tooltip" title="{{ help_fiscal }}">{{ entry_fiscal }}</span>
-						</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_fiscal" id="input-fiscal" class="form-control">
-								{% if payment_robokassa_fiscal %}
-									<option value="1" selected="selected">{{ text_yes }}</option>
-									<option value="0">{{ text_no }}</option>
-								{% else %}
-									<option value="1">{{ text_yes }}</option>
-									<option value="0" selected="selected">{{ text_no }}</option>
-								{% endif %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group hidden-fiscal input-marking" {% if not payment_robokassa_fiscal or payment_robokassa_country == 'KZT' %}style="display:none"{% endif %}>
-						<label class="col-sm-2 control-label" for="input-marking" title="{{ help_marking }}">{{ entry_marking }}</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_marking" id="input-marking" class="form-control"{% if payment_robokassa_country == 'KZT' %} disabled{% endif %}>
-								{% if payment_robokassa_marking %}
-									<option value="1" selected="selected">{{ text_yes }}</option>
-									<option value="0">{{ text_no }}</option>
-								{% else %}
-									<option value="1">{{ text_yes }}</option>
-									<option value="0" selected="selected">{{ text_no }}</option>
-								{% endif %}
-							</select>
-							<div class="form-text">{{ help_marking }}</div>
-						</div>
-					</div>
-					<div class="form-group hidden-fiscal" {% if not payment_robokassa_fiscal %}style="display:none"{% endif %} >
-						<label class="col-sm-2 control-label"
-							   for="input-order-tax-type">{{ entry_tax_type }}</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_tax_type" id="input-tax-type" class="form-control">
-								{% for key,value in robokassa_tax_type_list %}
-									{% if payment_robokassa_tax_type == key %}
-										<option value="{{ key }}" selected="selected">{{ value }}</option>
-									{% else %}
-										<option value="{{ key }}">{{ value }}</option>
-									{% endif %}
-								{% endfor %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group hidden-fiscal" {% if not payment_robokassa_fiscal %}style="display:none"{% endif %} >
-					<label class="col-sm-2 control-label" for="input-order-tax">{{ entry_tax }}</label>
-					<div class="col-sm-10">
-						<select name="payment_robokassa_tax" id="input-tax" class="form-control">
-							{% if payment_robokassa_country == 'RUB' %}
-							{% for key,value in robokassa_tax_list %}
-								{% if payment_robokassa_tax == key %}
-									<option value="{{ key }}" selected="selected">{{ value }}</option>
-								{% else %}
-									<option value="{{ key }}">{{ value }}</option>
-								{% endif %}
-							{% endfor %}
-							{% elseif payment_robokassa_country == 'KZT' %}
-							{% for key,value in robokassa_tax_list_kz %}
-								{% if payment_robokassa_tax == key %}
-									<option value="{{ key }}" selected="selected">{{ value }}</option>
-								{% else %}
-									<option value="{{ key }}">{{ value }}</option>
-								{% endif %}
-							{% endfor %}
-							{% endif %}
-						</select>
-					</div>
-			</div>
-					<div class="form-group hidden-fiscal" {% if not payment_robokassa_fiscal %}style="display:none"{% endif %} >
-						<label class="col-sm-2 control-label" for="input-order-payment-method">{{ entry_payment_method }}</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_payment_method" id="input-payment-method" class="form-control">
-								{% for key,value in robokassa_payment_method_list %}
-									{% if payment_robokassa_payment_method == key %}
-										<option value="{{ key }}" selected="selected">{{ value }}</option>
-									{% else %}
-										<option value="{{ key }}">{{ value }}</option>
-									{% endif %}
-								{% endfor %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group hidden-fiscal" {% if not payment_robokassa_fiscal %}style="display:none"{% endif %} >
-						<label class="col-sm-2 control-label" for="input-order-payment-object">{{ entry_payment_object }}</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_payment_object" id="input-payment-object" class="form-control">
-								{% for key,value in robokassa_payment_object_list %}
-									{% if payment_robokassa_payment_object == key %}
-										<option value="{{ key }}" selected="selected">{{ value }}</option>
-									{% else %}
-										<option value="{{ key }}">{{ value }}</option>
-									{% endif %}
-								{% endfor %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group hidden-fiscal" {% if not payment_robokassa_fiscal %}style="display:none"{% endif %}>
-						<label class="col-sm-2 control-label"
-						       for="input-status_id-check2"><span data-toggle="tooltip" title="Если Вам необходимо отправлять второй чек, выберите статус заказа, при котором будет осуществлена отправка">Статус заказа второй чек</span></label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_order_status_id_2check" id="input-status_id-check2" class="form-control">
-									<option value="0">Не выбрано</option>
-								{% for order_status in order_statuses %}
-									{% if order_status.order_status_id == payment_robokassa_order_status_id_2check %}
-										<option value="{{ order_status.order_status_id }}" selected="selected">{{ order_status.name }}</option>
-									{% else %}
-										<option value="{{ order_status.order_status_id }}">{{ order_status.name }}</option>
-									{% endif %}
-								{% endfor %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label" for="input-geo-zone">{{ entry_geo_zone }}</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_geo_zone_id" id="input-geo-zone" class="form-control">
-								<option value="0">{{ text_all_zones }}</option>
-								{% for geo_zone in geo_zones %}
-									{% if geo_zone.geo_zone_id == payment_robokassa_geo_zone_id %}
-										<option value="{{ geo_zone.geo_zone_id }}" selected="selected">{{ geo_zone.name }}</option>
-									{% else %}
-										<option value="{{ geo_zone.geo_zone_id }}">{{ geo_zone.name }}</option>
-									{% endif %}
-								{% endfor %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label"
-						       for="input-status">{{ entry_status }}</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_status" id="input-status" class="form-control">
-								{% if payment_robokassa_status %}
-									<option value="1" selected="selected">{{ text_enabled }}</option>
-									<option value="0">{{ text_disabled }}</option>
-								{% else %}
-									<option value="1">{{ text_enabled }}</option>
-									<option value="0" selected="selected">{{ text_disabled }}</option>
-								{% endif %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label"
-						       for="input-status-iframe"><span data-toggle="tooltip" title="{{ help_iframe }}">{{ entry_iframe }}</span></label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_status_iframe" id="input-status-iframe" class="form-control">
-								{% if payment_robokassa_status_iframe %}
-									<option value="1" selected="selected">{{ text_enabled }}</option>
-									<option value="0">{{ text_disabled }}</option>
-								{% else %}
-									<option value="1">{{ text_enabled }}</option>
-									<option value="0" selected="selected">{{ text_disabled }}</option>
-								{% endif %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label" for="input-status-hold">
-							<span data-toggle="tooltip" title="{{ help_hold }}">
-								<a href="https://docs.robokassa.ru/media/guides/hold_opencart.pdf">{{ entry_hold }}</a>
-							</span>
-						</label>
-						<div class="col-sm-10">
-							<select name="payment_robokassa_status_hold" id="input-status-hold" class="form-control">
-								{% if payment_robokassa_status_hold %}
-									<option value="1" selected="selected">{{ text_enabled }}</option>
-									<option value="0">{{ text_disabled }}</option>
-								{% else %}
-									<option value="1">{{ text_enabled }}</option>
-									<option value="0" selected="selected">{{ text_disabled }}</option>
-								{% endif %}
-							</select>
-						</div>
-					</div>
-					<div class="form-group">
-						<label class="col-sm-2 control-label" for="input-sort-order">{{ entry_sort_order }}</label>
-						<div class="col-sm-10">
-							<input type="text" name="payment_robokassa_sort_order" value="{{ payment_robokassa_sort_order }}" placeholder="{{ entry_sort_order }}" id="input-sort-order" class="form-control" />
-						</div>
-					</div>
+  <div class="container-fluid">
+    {% if success %}
+      <div class="alert alert-success"><i class="fas fa-check-circle"></i> {{ success }}<button type="button" class="btn-close float-end" data-bs-dismiss="alert" aria-label="Close"></button></div>
+    {% endif %}
+    {% if error_warning %}
+      <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> {{ error_warning }}<button type="button" class="btn-close float-end" data-bs-dismiss="alert" aria-label="Close"></button></div>
+    {% endif %}
 
-					<div class="form-group">
-						<label class="col-sm-2 control-label">{{ entry_languages_map }}</label>
-						<div class="col-sm-10">
-							{% for language in opencart_languages %}
-								<div>
-									<select class="form-control"
-											name="payment_robokassa_languages_map[{{ language.language_id }}]">
-										{% for robokassa_language in robokassa_available_languages %}
-											<option {% if payment_robokassa_languages_map[language.language_id] == robokassa_language %}selected{% endif %}>{{ robokassa_language }}</option>
-										{% endfor %}
-									</select>
-								</div>
-							{% endfor %}
-						</div>
-					</div>
-				</form>
-			</div>
-		</div>
-	</div>
+    <form action="{{ action }}" method="post" enctype="multipart/form-data" id="form-payment">
+      <section class="robokassa-hero">
+        <div class="robokassa-hero__brand">
+          <div class="robokassa-hero__logo"><img src="/extension/robokassa/admin/view/image/payment/robokassa.png" alt="Robokassa"></div>
+          <div>
+            <h2>Настройки Robokassa для OpenCart</h2>
+            <p>Подключение, чеки, способы оплаты и виджеты — в одном месте.</p>
+          </div>
+        </div>
+        <label class="robokassa-master-switch">
+          <input type="hidden" name="payment_robokassa_status" value="0">
+          <input type="checkbox" name="payment_robokassa_status" value="1" {% if payment_robokassa_status %}checked{% endif %}>
+          <span class="robokassa-switch" aria-hidden="true"></span>
+          <span>Приём платежей</span>
+        </label>
+      </section>
+
+      <nav class="robokassa-nav" aria-label="Разделы настроек">
+        <button type="button" class="robokassa-nav__item is-active" data-robokassa-tab="connection">
+          <i class="fas fa-plug"></i><span><strong>Подключение</strong><small>Магазин и API</small></span>
+        </button>
+        <button type="button" class="robokassa-nav__item" data-robokassa-tab="receipts">
+          <i class="fas fa-receipt"></i><span><strong>Чеки</strong><small>Фискализация</small></span>
+        </button>
+        <button type="button" class="robokassa-nav__item" data-robokassa-tab="methods">
+          <i class="fas fa-credit-card"></i><span><strong>Способы оплаты</strong><small>СБП и рассрочки</small></span>
+        </button>
+        <button type="button" class="robokassa-nav__item" data-robokassa-tab="widgets">
+          <i class="fas fa-th-large"></i><span><strong>Виджеты</strong><small>Карточка товара</small></span>
+        </button>
+        <button type="button" class="robokassa-nav__item" data-robokassa-tab="advanced">
+          <i class="fas fa-sliders-h"></i><span><strong>Дополнительно</strong><small>Поведение модуля</small></span>
+        </button>
+      </nav>
+
+      <div class="robokassa-tab is-active" data-robokassa-panel="connection">
+        <section class="robokassa-card">
+          <div class="robokassa-card__header">
+            <div><h3>Основные настройки</h3><p>Данные магазина и режим работы платёжного модуля.</p></div>
+            <span class="robokassa-badge {% if payment_robokassa_test %}is-warning{% else %}is-success{% endif %}">{% if payment_robokassa_test %}Тестовый режим{% else %}Основной режим{% endif %}</span>
+          </div>
+          <div class="robokassa-form-grid">
+            <div class="robokassa-field required">
+              <label for="input-merch-login">{{ entry_merch_login }}</label>
+              <input type="text" name="payment_robokassa_login" value="{{ payment_robokassa_login }}" id="input-merch-login" class="form-control" autocomplete="off">
+              {% if error_merch_login %}<div class="text-danger">{{ error_merch_login }}</div>{% endif %}
+            </div>
+            <div class="robokassa-field">
+              <label for="input-country">{{ entry_country }}</label>
+              <select name="payment_robokassa_country" id="input-country" class="form-select">
+                <option value="RUB" {% if payment_robokassa_country == 'RUB' %}selected{% endif %}>{{ text_ru }}</option>
+                <option value="KZT" {% if payment_robokassa_country == 'KZT' %}selected{% endif %}>{{ text_kz }}</option>
+              </select>
+            </div>
+            <div class="robokassa-field required">
+              <label for="input-password-1">{{ entry_password1 }}</label>
+              <input type="password" name="payment_robokassa_password_1" value="{{ payment_robokassa_password_1 }}" id="input-password-1" class="form-control" autocomplete="new-password">
+              {% if error_password1 %}<div class="text-danger">{{ error_password1 }}</div>{% endif %}
+            </div>
+            <div class="robokassa-field required">
+              <label for="input-password-2">{{ entry_password2 }}</label>
+              <input type="password" name="payment_robokassa_password_2" value="{{ payment_robokassa_password_2 }}" id="input-password-2" class="form-control" autocomplete="new-password">
+              {% if error_password2 %}<div class="text-danger">{{ error_password2 }}</div>{% endif %}
+            </div>
+            <div class="robokassa-field">
+              <label for="input-test-password-1">{{ entry_test_password1 }}</label>
+              <input type="password" name="payment_robokassa_test_password_1" value="{{ payment_robokassa_test_password_1 }}" id="input-test-password-1" class="form-control" autocomplete="new-password">
+            </div>
+            <div class="robokassa-field">
+              <label for="input-test-password-2">{{ entry_test_password2 }}</label>
+              <input type="password" name="payment_robokassa_test_password_2" value="{{ payment_robokassa_test_password_2 }}" id="input-test-password-2" class="form-control" autocomplete="new-password">
+            </div>
+            <div class="robokassa-field">
+              <label for="input-test">{{ entry_test }}</label>
+              <select name="payment_robokassa_test" id="input-test" class="form-select">
+                <option value="0" {% if not payment_robokassa_test %}selected{% endif %}>{{ text_no }}</option>
+                <option value="1" {% if payment_robokassa_test %}selected{% endif %}>{{ text_yes }}</option>
+              </select>
+            </div>
+            <div class="robokassa-field">
+              <label for="input-status-id">{{ entry_order_status }}</label>
+              <select name="payment_robokassa_order_status_id" id="input-status-id" class="form-select">
+                {% for order_status in order_statuses %}<option value="{{ order_status.order_status_id }}" {% if order_status.order_status_id == payment_robokassa_order_status_id %}selected{% endif %}>{{ order_status.name }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section class="robokassa-card robokassa-card--compact">
+          <div class="robokassa-card__header"><div><h3>URL для личного кабинета</h3><p>Скопируйте адреса и укажите их в технических настройках магазина Robokassa.</p></div></div>
+          <div class="robokassa-url-list">
+            <div><span>Result URL <small>POST</small></span><code id="robokassa-result-url">{{ payment_robokassa_result_url }}</code><button type="button" data-copy-target="robokassa-result-url"><i class="fas fa-copy"></i></button></div>
+            <div><span>Success URL <small>GET</small></span><code id="robokassa-success-url">{{ payment_robokassa_success_url }}</code><button type="button" data-copy-target="robokassa-success-url"><i class="fas fa-copy"></i></button></div>
+            <div><span>Fail URL <small>POST</small></span><code id="robokassa-fail-url">{{ payment_robokassa_fail_url }}</code><button type="button" data-copy-target="robokassa-fail-url"><i class="fas fa-copy"></i></button></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="robokassa-tab" data-robokassa-panel="receipts">
+        <section class="robokassa-card">
+          <div class="robokassa-card__header"><div><h3>Фискализация и маркировка</h3><p>Параметры формирования первого и итогового чеков.</p></div></div>
+          <div class="robokassa-form-grid">
+            <div class="robokassa-field">
+              <label for="input-fiscal"><span data-bs-toggle="tooltip" title="{{ help_fiscal }}">{{ entry_fiscal }}</span></label>
+              <select name="payment_robokassa_fiscal" id="input-fiscal" class="form-select"><option value="0" {% if not payment_robokassa_fiscal %}selected{% endif %}>{{ text_no }}</option><option value="1" {% if payment_robokassa_fiscal %}selected{% endif %}>{{ text_yes }}</option></select>
+            </div>
+            <div class="robokassa-field" data-fiscal-only data-russia-only>
+              <label for="input-marking"><span data-bs-toggle="tooltip" title="{{ help_marking }}">{{ entry_marking }}</span></label>
+              <select name="payment_robokassa_marking" id="input-marking" class="form-select"><option value="0" {% if not payment_robokassa_marking %}selected{% endif %}>{{ text_no }}</option><option value="1" {% if payment_robokassa_marking %}selected{% endif %}>{{ text_yes }}</option></select>
+            </div>
+            <div class="robokassa-field" data-fiscal-only>
+              <label for="input-tax-type">{{ entry_tax_type }}</label>
+              <select name="payment_robokassa_tax_type" id="input-tax-type" class="form-select">{% for key, value in robokassa_tax_type_list %}<option value="{{ key }}" {% if payment_robokassa_tax_type == key %}selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+            </div>
+            <div class="robokassa-field" data-fiscal-only>
+              <label for="input-tax">{{ entry_tax }}</label>
+              <select name="payment_robokassa_tax" id="input-tax" class="form-select">{% if payment_robokassa_country == 'KZT' %}{% for key, value in robokassa_tax_list_kz %}<option value="{{ key }}" {% if payment_robokassa_tax == key %}selected{% endif %}>{{ value }}</option>{% endfor %}{% else %}{% for key, value in robokassa_tax_list %}<option value="{{ key }}" {% if payment_robokassa_tax == key %}selected{% endif %}>{{ value }}</option>{% endfor %}{% endif %}</select>
+            </div>
+            <div class="robokassa-field" data-fiscal-only data-russia-only>
+              <label for="input-payment-method">{{ entry_payment_method }}</label>
+              <select name="payment_robokassa_payment_method" id="input-payment-method" class="form-select">{% for key, value in robokassa_payment_method_list %}<option value="{{ key }}" {% if payment_robokassa_payment_method == key %}selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+            </div>
+            <div class="robokassa-field" data-fiscal-only data-russia-only>
+              <label for="input-payment-object">{{ entry_payment_object }}</label>
+              <select name="payment_robokassa_payment_object" id="input-payment-object" class="form-select">{% for key, value in robokassa_payment_object_list %}<option value="{{ key }}" {% if payment_robokassa_payment_object == key %}selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+            </div>
+            <div class="robokassa-field robokassa-field--wide" data-fiscal-only data-russia-only>
+              <label for="input-status-id-check2">Статус заказа для итогового чека</label>
+              <select name="payment_robokassa_order_status_id_2check" id="input-status-id-check2" class="form-select"><option value="0">Не выбрано</option>{% for order_status in order_statuses %}<option value="{{ order_status.order_status_id }}" {% if order_status.order_status_id == payment_robokassa_order_status_id_2check %}selected{% endif %}>{{ order_status.name }}</option>{% endfor %}</select>
+              <small>Итоговый чек отправится один раз при переходе заказа в выбранный статус.</small>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="robokassa-tab" data-robokassa-panel="methods">
+        <section class="robokassa-card">
+          <div class="robokassa-card__header">
+            <div><h3>Дополнительные способы оплаты</h3><p>Они останутся отдельными вариантами для покупателя, но управляются из этой страницы.</p></div>
+            {% if show_update_methods %}<button type="submit" name="robokassa_action" value="update_methods" class="btn btn-light"><i class="fas fa-sync-alt"></i> {{ button_update_methods }}</button>{% endif %}
+          </div>
+          <div class="robokassa-method-grid">
+            {% for method in robokassa_payment_methods %}
+              <article class="robokassa-method-card {% if method.enabled %}is-enabled{% endif %}">
+                <div class="robokassa-method-card__icon"><i class="fas {% if method.code == 'sbp' %}fa-qrcode{% else %}fa-credit-card{% endif %}"></i></div>
+                <div class="robokassa-method-card__content">
+                  <div class="robokassa-method-card__title"><h4>{{ method.title }}</h4>{% if method.availability_known %}<span class="robokassa-availability {% if method.available %}is-available{% else %}is-unavailable{% endif %}">{% if method.available %}Доступен{% else %}Недоступен магазину{% endif %}</span>{% else %}<span class="robokassa-availability">Не проверен</span>{% endif %}</div>
+                  <p>{{ method.description }}</p>
+                </div>
+                <label class="robokassa-toggle" title="Включить способ оплаты">
+                  <input type="hidden" name="{{ method.setting_key }}" value="0">
+                  <input type="checkbox" name="{{ method.setting_key }}" value="1" {% if method.enabled %}checked{% endif %}>
+                  <span class="robokassa-switch" aria-hidden="true"></span>
+                </label>
+              </article>
+            {% endfor %}
+          </div>
+          <div class="robokassa-inline-note"><i class="fas fa-info-circle"></i><span>Список доступности берётся из Robokassa. Если вы подключили новый способ в личном кабинете, нажмите «{{ button_update_methods }}».</span></div>
+        </section>
+      </div>
+
+      <div class="robokassa-tab" data-robokassa-panel="widgets">
+        <section class="robokassa-card">
+          <div class="robokassa-card__header">
+            <div><h3>Виджеты в карточке товара</h3><p>Настройте внешний вид блоков оплаты частями, кредита и рассрочки.</p></div>
+            <label class="robokassa-toggle robokassa-toggle--labeled"><input type="hidden" name="payment_robokassa_widget_status" value="0"><input type="checkbox" name="payment_robokassa_widget_status" value="1" {% if payment_robokassa_widget_status %}checked{% endif %}><span class="robokassa-switch"></span><strong>Показывать виджеты</strong></label>
+          </div>
+          <div class="robokassa-widget-grid">
+            <div class="robokassa-subcard">
+              <h4><i class="fas fa-chart-pie"></i> Оплата частями</h4>
+              <div class="robokassa-form-grid robokassa-form-grid--single">
+                <div class="robokassa-field"><label for="input-bnpl-theme">Тема</label><select name="payment_robokassa_widget_bnpl_theme" id="input-bnpl-theme" class="form-select"><option value="light" {% if payment_robokassa_widget_bnpl_theme == 'light' %}selected{% endif %}>Светлая</option><option value="dark" {% if payment_robokassa_widget_bnpl_theme == 'dark' %}selected{% endif %}>Тёмная</option></select></div>
+                <div class="robokassa-field"><label for="input-bnpl-size">Размер</label><select name="payment_robokassa_widget_bnpl_size" id="input-bnpl-size" class="form-select"><option value="s" {% if payment_robokassa_widget_bnpl_size == 's' %}selected{% endif %}>S</option><option value="m" {% if payment_robokassa_widget_bnpl_size == 'm' %}selected{% endif %}>M</option></select></div>
+                <div class="robokassa-field"><label for="input-bnpl-logo">Показывать логотип</label><select name="payment_robokassa_widget_bnpl_show_logo" id="input-bnpl-logo" class="form-select"><option value="1" {% if payment_robokassa_widget_bnpl_show_logo %}selected{% endif %}>{{ text_yes }}</option><option value="0" {% if not payment_robokassa_widget_bnpl_show_logo %}selected{% endif %}>{{ text_no }}</option></select></div>
+                <div class="robokassa-field"><label for="input-bnpl-radius">Скругление углов</label><input type="number" min="0" max="100" name="payment_robokassa_widget_bnpl_border_radius" value="{{ payment_robokassa_widget_bnpl_border_radius }}" id="input-bnpl-radius" class="form-control"></div>
+                <div class="robokassa-field"><label for="input-bnpl-second-line">Вторая строка</label><select name="payment_robokassa_widget_bnpl_has_second_line" id="input-bnpl-second-line" class="form-select"><option value="1" {% if payment_robokassa_widget_bnpl_has_second_line %}selected{% endif %}>{{ text_yes }}</option><option value="0" {% if not payment_robokassa_widget_bnpl_has_second_line %}selected{% endif %}>{{ text_no }}</option></select></div>
+                <div class="robokassa-field"><label for="input-bnpl-position">Позиция описания</label><select name="payment_robokassa_widget_bnpl_description_position" id="input-bnpl-position" class="form-select"><option value="left" {% if payment_robokassa_widget_bnpl_description_position == 'left' %}selected{% endif %}>Слева</option><option value="right" {% if payment_robokassa_widget_bnpl_description_position == 'right' %}selected{% endif %}>Справа</option></select></div>
+              </div>
+            </div>
+            <div class="robokassa-subcard robokassa-subcard--dark">
+              <h4><i class="fas fa-chart-line"></i> Кредит и рассрочка</h4>
+              <div class="robokassa-form-grid robokassa-form-grid--single">
+                <div class="robokassa-field"><label for="input-credit-theme">Тема</label><select name="payment_robokassa_widget_credit_theme" id="input-credit-theme" class="form-select"><option value="light" {% if payment_robokassa_widget_credit_theme == 'light' %}selected{% endif %}>Светлая</option><option value="dark" {% if payment_robokassa_widget_credit_theme == 'dark' %}selected{% endif %}>Тёмная</option></select></div>
+                <div class="robokassa-field"><label for="input-credit-size">Размер</label><select name="payment_robokassa_widget_credit_size" id="input-credit-size" class="form-select"><option value="s" {% if payment_robokassa_widget_credit_size == 's' %}selected{% endif %}>S</option><option value="m" {% if payment_robokassa_widget_credit_size == 'm' %}selected{% endif %}>M</option></select></div>
+                <div class="robokassa-field"><label for="input-credit-logo">Показывать логотип</label><select name="payment_robokassa_widget_credit_show_logo" id="input-credit-logo" class="form-select"><option value="1" {% if payment_robokassa_widget_credit_show_logo %}selected{% endif %}>{{ text_yes }}</option><option value="0" {% if not payment_robokassa_widget_credit_show_logo %}selected{% endif %}>{{ text_no }}</option></select></div>
+                <div class="robokassa-field"><label for="input-credit-radius">Скругление углов</label><input type="number" min="0" max="100" name="payment_robokassa_widget_credit_border_radius" value="{{ payment_robokassa_widget_credit_border_radius }}" id="input-credit-radius" class="form-control"></div>
+                <div class="robokassa-field"><label for="input-credit-second-line">Вторая строка</label><select name="payment_robokassa_widget_credit_has_second_line" id="input-credit-second-line" class="form-select"><option value="1" {% if payment_robokassa_widget_credit_has_second_line %}selected{% endif %}>{{ text_yes }}</option><option value="0" {% if not payment_robokassa_widget_credit_has_second_line %}selected{% endif %}>{{ text_no }}</option></select></div>
+                <div class="robokassa-field"><label for="input-credit-position">Позиция описания</label><select name="payment_robokassa_widget_credit_description_position" id="input-credit-position" class="form-select"><option value="left" {% if payment_robokassa_widget_credit_description_position == 'left' %}selected{% endif %}>Слева</option><option value="right" {% if payment_robokassa_widget_credit_description_position == 'right' %}selected{% endif %}>Справа</option></select></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="robokassa-tab" data-robokassa-panel="advanced">
+        <section class="robokassa-card">
+          <div class="robokassa-card__header"><div><h3>Дополнительные настройки</h3><p>География, отображение и технические параметры модуля.</p></div></div>
+          <div class="robokassa-form-grid">
+            <div class="robokassa-field"><label for="input-geo-zone">{{ entry_geo_zone }}</label><select name="payment_robokassa_geo_zone_id" id="input-geo-zone" class="form-select"><option value="0">{{ text_all_zones }}</option>{% for geo_zone in geo_zones %}<option value="{{ geo_zone.geo_zone_id }}" {% if geo_zone.geo_zone_id == payment_robokassa_geo_zone_id %}selected{% endif %}>{{ geo_zone.name }}</option>{% endfor %}</select></div>
+            <div class="robokassa-field"><label for="input-sort-order">{{ entry_sort_order }}</label><input type="number" name="payment_robokassa_sort_order" value="{{ payment_robokassa_sort_order }}" id="input-sort-order" class="form-control"></div>
+            <div class="robokassa-field"><label for="input-iframe"><span data-bs-toggle="tooltip" title="{{ help_iframe }}">{{ entry_iframe }}</span></label><select name="payment_robokassa_status_iframe" id="input-iframe" class="form-select"><option value="1" {% if payment_robokassa_status_iframe %}selected{% endif %}>{{ text_enabled }}</option><option value="0" {% if not payment_robokassa_status_iframe %}selected{% endif %}>{{ text_disabled }}</option></select></div>
+            <div class="robokassa-field"><label for="input-hold"><span data-bs-toggle="tooltip" title="{{ help_hold }}">{{ entry_hold }}</span></label><select name="payment_robokassa_status_hold" id="input-hold" class="form-select"><option value="1" {% if payment_robokassa_status_hold %}selected{% endif %}>{{ text_enabled }}</option><option value="0" {% if not payment_robokassa_status_hold %}selected{% endif %}>{{ text_disabled }}</option></select></div>
+            <div class="robokassa-field robokassa-field--wide"><label>{{ entry_languages_map }}</label><div class="robokassa-language-grid">{% for language in opencart_languages %}<label><span>{{ language.name }}</span><select class="form-select" name="payment_robokassa_languages_map[{{ language.language_id }}]">{% for robokassa_language in robokassa_available_languages %}<option value="{{ robokassa_language }}" {% if payment_robokassa_languages_map[language.language_id] == robokassa_language %}selected{% endif %}>{{ robokassa_language }}</option>{% endfor %}</select></label>{% endfor %}</div></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="robokassa-savebar">
+        <span><i class="fas fa-shield-alt"></i> Настройки применяются ко всем способам оплаты Robokassa.</span>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ button_save }}</button>
+      </div>
+    </form>
+  </div>
 </div>
-
-<script>
-	function syncRobokassaFiscalFields() {
-		var fiscalEnabled = $('#input-fiscal').val() == '1';
-		var isKazakhstan = $('#input-country').val() == 'KZT';
-		var rubOnlyFields = $('#input-tax-type, #input-status_id-check2, #input-payment-object, #input-payment-method, #input-marking');
-
-		$('.hidden-fiscal').toggle(fiscalEnabled).toggleClass('alert-warning', fiscalEnabled);
-		rubOnlyFields.prop('disabled', isKazakhstan);
-
-		if (isKazakhstan || !fiscalEnabled) {
-			$('.input-marking').hide();
-		} else {
-			$('.input-marking').show();
-		}
-	}
-
-	$('#input-country, #input-fiscal').on('change', syncRobokassaFiscalFields);
-	syncRobokassaFiscalFields();
-</script>
-{{ footer }} 
+<script src="/extension/robokassa/admin/view/javascript/robokassa/settings.js" type="text/javascript"></script>
+{{ footer }}

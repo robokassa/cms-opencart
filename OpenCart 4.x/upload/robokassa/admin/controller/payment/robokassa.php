@@ -30,7 +30,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
             $is_login_changed = $methods_initialized && $methods_login !== $merchant_login;
             $methods_updated = false;
 
-            $this->saveSettingDirect('payment_robokassa', $this->request->post);
+            $this->saveUnifiedSettings($this->request->post);
 
             if ($is_update_request || $is_first_sync || $is_login_changed) {
                 $methods = $this->fetchInstallmentMethods($merchant_login);
@@ -196,6 +196,30 @@ class Robokassa extends \Opencart\System\Engine\Controller
             'payment_robokassa_widget_credit_description_position' => 'right'
         ] as $key => $default) {
             $data[$key] = $this->request->post[$key] ?? ($this->config->get($key) !== null && $this->config->get($key) !== '' ? $this->config->get($key) : $default);
+        }
+
+        $available_aliases = $this->getStoredInstallmentAliases();
+        $available_labels = array_change_key_case($this->getStoredInstallmentLabels(), CASE_LOWER);
+        $availability_known = (int)$this->config->get('payment_robokassa_methods_initialized') === 1
+            && trim((string)$this->config->get('payment_robokassa_methods_login')) === trim((string)$this->config->get('payment_robokassa_login'));
+        $method_definitions = [
+            ['code' => 'credit', 'alias' => 'otp', 'title' => 'Кредит и рассрочка', 'description' => 'Оплата заказа в кредит или рассрочку через OTP.'],
+            ['code' => 'mokka', 'alias' => 'mokka', 'title' => 'Mokka', 'description' => 'Покупка сейчас с оплатой частями через Mokka.'],
+            ['code' => 'podeli', 'alias' => 'podeli', 'title' => 'Подели', 'description' => 'Разделение стоимости заказа на несколько платежей.'],
+            ['code' => 'sbp', 'alias' => 'sbp', 'title' => 'СБП', 'description' => 'Быстрая оплата по QR-коду через Систему быстрых платежей.'],
+            ['code' => 'yandex_split', 'alias' => 'yandexpaysplit', 'title' => 'Яндекс Сплит', 'description' => 'Оплата заказа частями с помощью Яндекс Сплит.']
+        ];
+
+        $data['robokassa_payment_methods'] = [];
+
+        foreach ($method_definitions as $method) {
+            $setting_key = 'payment_robokassa_' . $method['code'] . '_status';
+            $method['setting_key'] = $setting_key;
+            $method['enabled'] = (bool)$data[$setting_key];
+            $method['availability_known'] = $availability_known;
+            $method['available'] = in_array($method['alias'], $available_aliases, true)
+                && ($method['code'] !== 'sbp' || strtoupper((string)($available_labels['sbp'] ?? '')) === 'SBPPSR');
+            $data['robokassa_payment_methods'][] = $method;
         }
 
         if (isset($this->request->post['payment_robokassa_country'])) {
@@ -479,6 +503,58 @@ class Robokassa extends \Opencart\System\Engine\Controller
             }
 
             $this->config->set((string)$key, $value);
+        }
+    }
+
+    private function getSettingDirect(string $code, int $store_id = 0): array
+    {
+        $settings = [];
+        $query = $this->db->query("SELECT `key`, `value`, `serialized` FROM `" . DB_PREFIX . "setting` WHERE `store_id` = '" . (int)$store_id . "' AND `code` = '" . $this->db->escape($code) . "'");
+
+        foreach ($query->rows as $row) {
+            $settings[$row['key']] = $row['serialized'] ? json_decode($row['value'], true) : $row['value'];
+        }
+
+        return $settings;
+    }
+
+    private function saveUnifiedSettings(array $settings, int $store_id = 0): void
+    {
+        $child_codes = [
+            'payment_robokassa_credit',
+            'payment_robokassa_mokka',
+            'payment_robokassa_podeli',
+            'payment_robokassa_sbp',
+            'payment_robokassa_yandex_split',
+            'payment_robokassa_widget'
+        ];
+        $grouped_settings = array_fill_keys($child_codes, []);
+        $main_settings = [];
+
+        foreach ($settings as $key => $value) {
+            if (strpos((string)$key, 'payment_robokassa_') !== 0) {
+                continue;
+            }
+
+            $child_setting = false;
+
+            foreach ($child_codes as $code) {
+                if (strpos((string)$key, $code . '_') === 0) {
+                    $grouped_settings[$code][$key] = $value;
+                    $child_setting = true;
+                    break;
+                }
+            }
+
+            if (!$child_setting) {
+                $main_settings[$key] = $value;
+            }
+        }
+
+        $this->saveSettingDirect('payment_robokassa', $main_settings, $store_id);
+
+        foreach ($grouped_settings as $code => $values) {
+            $this->saveSettingDirect($code, array_merge($this->getSettingDirect($code, $store_id), $values), $store_id);
         }
     }
 

@@ -6,45 +6,10 @@ class Robokassa extends \Opencart\System\Engine\Controller
     private static array $done = [];
     private static array $savedProducts = [];
 
-    private function getRobokassaInstallmentAliases(): array
-    {
-        $robokassa_methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
-        $robokassa_current_login = trim((string)$this->config->get('payment_robokassa_login'));
-        $robokassa_saved_login = trim((string)$this->config->get('payment_robokassa_methods_login'));
-        $robokassa_aliases = $this->config->get('payment_robokassa_methods_aliases');
-
-        if (!$robokassa_methods_initialized || $robokassa_current_login === '' || $robokassa_saved_login !== $robokassa_current_login || !is_array($robokassa_aliases)) {
-            return [];
-        }
-
-        return array_values(array_unique(array_map(static function ($robokassa_alias): string {
-            return strtolower((string)$robokassa_alias);
-        }, $robokassa_aliases)));
-    }
-
     private function filterRobokassaPaymentList(string $output): string
     {
-        $robokassa_installment_map = [
-            'robokassa_podeli' => 'podeli',
-            'robokassa_credit' => 'otp',
-            'robokassa_mokka' => 'mokka',
-            'robokassa_sbp' => 'sbp',
-            'robokassa_yandex_split' => 'yandexpaysplit',
-            'robokassa_split' => 'yandexpaysplit'
-        ];
-        $robokassa_bnpl_aliases = ['podeli', 'otp', 'mokka', 'yandexpaysplit'];
-        $robokassa_installment_aliases = $this->getRobokassaInstallmentAliases();
-
-        foreach ($robokassa_installment_map as $robokassa_code => $robokassa_alias) {
-            if (in_array($robokassa_alias, $robokassa_installment_aliases, true)) {
-                continue;
-            }
-
+        foreach (['robokassa_credit', 'robokassa_mokka', 'robokassa_podeli', 'robokassa_sbp', 'robokassa_split', 'robokassa_widget', 'robokassa_yandex_split'] as $robokassa_code) {
             $output = $this->removeRobokassaPaymentRow($output, $robokassa_code);
-        }
-
-        if (!array_intersect($robokassa_bnpl_aliases, $robokassa_installment_aliases)) {
-            $output = $this->removeRobokassaPaymentRow($output, 'robokassa_widget');
         }
 
         return $output;
