@@ -1,0 +1,28 @@
+.robokassa-refund-page { padding-bottom: 30px; }
+.robokassa-refund-summary { display: grid; gap: 14px; grid-template-columns: repeat(3, 1fr); margin: 24px 0 18px; }
+.robokassa-refund-summary > div { background: #fff; border: 1px solid var(--rk-line); border-radius: 16px; padding: 18px 20px; }
+.robokassa-refund-summary small, .robokassa-refund-summary strong { display: block; }
+.robokassa-refund-summary small { color: var(--rk-muted); margin-bottom: 6px; }
+.robokassa-refund-summary strong { color: var(--rk-ink); font-size: 20px; }
+.robokassa-refund-summary .is-primary { background: linear-gradient(135deg, var(--rk-primary), var(--rk-primary-dark)); border: 0; }
+.robokassa-refund-summary .is-primary small, .robokassa-refund-summary .is-primary strong { color: #fff; }
+.robokassa-refund-mode { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); margin-bottom: 22px; }
+.robokassa-refund-mode label { align-items: flex-start; border: 1px solid var(--rk-line); border-radius: 14px; cursor: pointer; display: flex; gap: 10px; margin: 0; padding: 16px; }
+.robokassa-refund-mode label.is-active { background: #f5f8ff; border-color: #9bb8f5; }
+.robokassa-refund-mode strong, .robokassa-refund-mode small { display: block; }
+.robokassa-refund-mode small { color: var(--rk-muted); font-weight: 400; margin-top: 4px; }
+.robokassa-refund-fields { margin-top: 24px; }
+.robokassa-refund-muted { color: var(--rk-muted); display: block; font-weight: 400; margin-top: 4px; }
+.robokassa-refund-submit { align-items: center; border-top: 1px solid var(--rk-line); color: var(--rk-muted); display: flex; justify-content: space-between; margin-top: 24px; padding-top: 18px; }
+.robokassa-refund-status { border-radius: 999px; display: inline-block; font-size: 12px; font-weight: 600; padding: 6px 10px; }
+.robokassa-refund-status.status-finished { background: #e9f8f1; color: #168759; }
+.robokassa-refund-status.status-processing, .robokassa-refund-status.status-submitting { background: #eef4ff; color: #2563eb; }
+.robokassa-refund-status.status-unknown { background: #fff5da; color: #9a6700; }
+.robokassa-refund-status.status-canceled, .robokassa-refund-status.status-failed { background: #fff0f0; color: #c03636; }
+.robokassa-refund-page .table > tbody > tr > td { vertical-align: middle; }
+.robokassa-refund-page .label { display: inline-block; margin-top: 6px; }
+
+@media (max-width: 700px) {
+  .robokassa-refund-summary, .robokassa-refund-mode { grid-template-columns: 1fr; }
+  .robokassa-refund-submit { align-items: flex-start; flex-direction: column; gap: 14px; }
+}
