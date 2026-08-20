@@ -1,7 +1,7 @@
 <modification>
   <code>Robokassa</code>
   <name>Robokassa opencart</name>
-  <version>1.1.0</version>
+  <version>1.1.1</version>
   <author>Robokassa</author>
   <link>https://robokassa.com</link>
   <file path="catalog/controller/api/order.php">
@@ -10,10 +10,17 @@
       <add position="before"><![CDATA[
         // Final check
         if($order_info['order_status_id'] != $this->request->post['order_status_id'] && strpos((string)$order_info['payment_code'], 'robokassa') === 0 && $this->request->post['order_status_id'] == $this->config->get('payment_robokassa_order_status_id_2check') && $this->config->get('payment_robokassa_fiscal') == 1){
-		  $this->load->model('extension/payment/robokassa');
+          $this->load->model('extension/payment/robokassa');
 
-		  $this->model_extension_payment_robokassa->sendSecondCheck($order_id);
-		}
+          try {
+            $this->model_extension_payment_robokassa->sendSecondCheck($order_id);
+          } catch (Exception $e) {
+            $json['error'] = $e->getMessage();
+            $this->response->addHeader('Content-Type: application/json');
+            $this->response->setOutput(json_encode($json));
+            return;
+          }
+        }
         // Final check
 
         // Added condition for robokassa_hold_confirm
@@ -536,6 +543,136 @@
 
           $files = $robokassa_payment_files;
         }
+      ]]></add>
+    </operation>
+  </file>
+  <file path="admin/controller/sale/order.php">
+    <operation error="skip">
+      <search><![CDATA[$data['products'][] = array(]]></search>
+      <add position="before"><![CDATA[
+            $this->load->model('extension/payment/robokassa');
+            $this->load->language('extension/payment/robokassa');
+
+            if (!isset($data['_robokassa_marking_initialized'])) {
+                $data['_robokassa_marking_initialized'] = true;
+                $data['robokassa_marking_enabled'] = $this->config->get('payment_robokassa_marking')
+                    && $this->config->get('payment_robokassa_fiscal')
+                    && $this->config->get('payment_robokassa_country') === 'RUB'
+                    && isset($order_info['payment_code'])
+                    && strpos((string)$order_info['payment_code'], 'robokassa') === 0;
+                $data['robokassa_marking_incomplete'] = false;
+                $data['column_marking'] = $this->language->get('column_marking');
+                $data['text_marking_empty'] = $this->language->get('text_marking_empty');
+                $data['text_marking_partial'] = $this->language->get('text_marking_partial');
+                $data['text_marking_filled'] = $this->language->get('text_marking_filled');
+                $data['text_marking_not_required'] = $this->language->get('text_marking_not_required');
+                $data['button_marking_save'] = $this->language->get('button_marking_save');
+                $data['marking_unit'] = $this->language->get('marking_unit');
+                $data['warning_marking_incomplete'] = $this->language->get('warning_marking_incomplete');
+                $data['error_marking_load'] = $this->language->get('error_marking_load');
+                $data['error_marking_save'] = $this->language->get('error_marking_save');
+                $data['robokassa_marking_get_url'] = str_replace('&amp;', '&', $this->url->link('extension/payment/robokassa/getOrderProductMarking', 'user_token=' . $this->session->data['user_token'], true));
+                $data['robokassa_marking_save_url'] = str_replace('&amp;', '&', $this->url->link('extension/payment/robokassa/saveOrderProductMarking', 'user_token=' . $this->session->data['user_token'], true));
+
+                if ($data['robokassa_marking_enabled']) {
+                    $this->model_extension_payment_robokassa->installMarkingTables();
+                    $this->document->addStyle('view/stylesheet/robokassa/marking.css');
+                }
+            }
+
+            $robokassa_marking_required = $data['robokassa_marking_enabled']
+                && $this->model_extension_payment_robokassa->isProductMarkingRequired($product['product_id']);
+            $robokassa_marking_status = $robokassa_marking_required
+                ? $this->model_extension_payment_robokassa->getMarkingStatus($product['order_product_id'], $product['quantity'])
+                : 'not_required';
+
+            if ($robokassa_marking_required && $robokassa_marking_status !== 'filled') {
+                $data['robokassa_marking_incomplete'] = true;
+            }
+      ]]></add>
+    </operation>
+    <operation error="skip">
+      <search><![CDATA[$data['products'][] = array(]]></search>
+      <add position="after"><![CDATA[
+                'robokassa_marking_required' => $robokassa_marking_required,
+                'robokassa_marking_status' => $robokassa_marking_status,
+      ]]></add>
+    </operation>
+  </file>
+  <file path="admin/view/template/sale/order_info.twig">
+    <operation error="skip">
+      <search><![CDATA[<h1>{{ heading_title }}</h1>]]></search>
+      <add position="after"><![CDATA[
+        {% if robokassa_marking_enabled and robokassa_marking_incomplete %}
+        <div class="alert alert-warning"><i class="fa fa-exclamation-triangle"></i> {{ warning_marking_incomplete }}</div>
+        {% endif %}
+      ]]></add>
+    </operation>
+    <operation error="skip">
+      <search><![CDATA[<td class="text-right">{{ column_total }}</td>]]></search>
+      <add position="before"><![CDATA[
+              {% if robokassa_marking_enabled %}<td class="text-center">{{ column_marking }}</td>{% endif %}
+      ]]></add>
+    </operation>
+    <operation error="skip">
+      <search><![CDATA[<td class="text-right">{{ product.total }}</td>]]></search>
+      <add position="before"><![CDATA[
+              {% if robokassa_marking_enabled %}
+              <td class="text-center">
+                {% if product.robokassa_marking_required %}
+                  {% set marking_class = product.robokassa_marking_status == 'filled' ? 'btn-success' : (product.robokassa_marking_status == 'partial' ? 'btn-warning' : 'btn-danger') %}
+                  {% set marking_text = product.robokassa_marking_status == 'filled' ? text_marking_filled : (product.robokassa_marking_status == 'partial' ? text_marking_partial : text_marking_empty) %}
+                  <button type="button" class="btn btn-sm {{ marking_class }} robokassa-marking-button"
+                          data-order-product-id="{{ product.order_product_id }}"
+                          data-label-empty="{{ text_marking_empty }}"
+                          data-label-partial="{{ text_marking_partial }}"
+                          data-label-filled="{{ text_marking_filled }}">
+                    <i class="fa fa-barcode"></i> <span class="robokassa-marking-status">{{ marking_text }}</span>
+                  </button>
+                {% else %}
+                  {{ text_marking_not_required }}
+                {% endif %}
+              </td>
+              {% endif %}
+      ]]></add>
+    </operation>
+    <operation error="skip">
+      <search regex="true"><![CDATA[~<td colspan="\d+" class="text-right">\{\{ total\.title \}\}~]]></search>
+      <add position="replace"><![CDATA[<td colspan="{% if robokassa_marking_enabled %}5{% else %}4{% endif %}" class="text-right">{{ total.title }}]]></add>
+    </operation>
+    <operation error="skip">
+      <search><![CDATA[{{ footer }}]]></search>
+      <add position="before"><![CDATA[
+{% if robokassa_marking_enabled %}
+<div class="modal fade" id="robokassa-marking-modal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title" id="robokassa-marking-title"></h4>
+      </div>
+      <div class="modal-body">
+        <div id="robokassa-marking-fields"></div>
+        <div id="robokassa-marking-message"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" id="robokassa-marking-save">{{ button_marking_save }}</button>
+        <button type="button" class="btn btn-default" data-dismiss="modal">{{ button_cancel }}</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+window.robokassaMarking = {
+  getUrl: '{{ robokassa_marking_get_url|raw }}',
+  saveUrl: '{{ robokassa_marking_save_url|raw }}',
+  unitLabel: {{ marking_unit|json_encode|raw }},
+  loadError: {{ error_marking_load|json_encode|raw }},
+  saveError: {{ error_marking_save|json_encode|raw }}
+};
+</script>
+<script src="view/javascript/robokassa/marking.js"></script>
+{% endif %}
       ]]></add>
     </operation>
   </file>

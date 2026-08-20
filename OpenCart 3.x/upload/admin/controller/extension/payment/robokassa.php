@@ -12,6 +12,9 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         $this->load->model('setting/setting');
         $this->load->model('localisation/language');
+        $this->load->model('extension/payment/robokassa');
+        $this->model_extension_payment_robokassa->installMarkingTables();
+        $this->registerMarkingEvents();
 
         if (($this->request->server['REQUEST_METHOD'] == 'POST') && $this->validate()) {
             $is_update_request = isset($this->request->post['robokassa_action']) && $this->request->post['robokassa_action'] === 'update_methods';
@@ -130,6 +133,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $data['entry_country'] = $this->language->get('entry_country');
         $data['entry_iframe'] = $this->language->get('entry_iframe');
 		$data['entry_product_options'] = $this->language->get('entry_product_options');
+        $data['entry_marking'] = $this->language->get('entry_marking');
         $entry_widget_status = $this->language->get('entry_widget_status');
         $data['entry_widget_status'] = ($entry_widget_status && $entry_widget_status !== 'entry_widget_status')
             ? $entry_widget_status
@@ -137,6 +141,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
         $data['help_fiscal'] = $this->language->get('help_fiscal') . ' Для корректной работы способов оплаты через рассрочку и виджетов в карточке товара этот параметр должен быть включен.';
         $data['help_iframe'] = $this->language->get('help_iframe');
+        $data['help_marking'] = $this->language->get('help_marking');
         $help_widget_status = $this->language->get('help_widget_status');
         $data['help_widget_status'] = ($help_widget_status && $help_widget_status !== 'help_widget_status')
             ? $help_widget_status
@@ -275,6 +280,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
             'agent_commission' => 'агентское вознаграждение',
             'composite' => 'составной предмет расчета',
             'another' => 'иной предмет расчета',
+            'tovar_mark' => 'маркируемый товар с кодом маркировки',
         );
 
         if (isset($this->request->post['payment_robokassa_tax_type'])) {
@@ -293,6 +299,12 @@ class ControllerExtensionPaymentRobokassa extends Controller
             $data['payment_robokassa_fiscal'] = $this->request->post['payment_robokassa_fiscal'];
         } else {
             $data['payment_robokassa_fiscal'] = $this->config->get('payment_robokassa_fiscal');
+        }
+
+        if (isset($this->request->post['payment_robokassa_marking'])) {
+            $data['payment_robokassa_marking'] = $this->request->post['payment_robokassa_marking'];
+        } else {
+            $data['payment_robokassa_marking'] = $this->config->get('payment_robokassa_marking');
         }
 		if (isset($this->request->post['payment_robokassa_send_product_options'])) {
 			$data['payment_robokassa_send_product_options'] = $this->request->post['payment_robokassa_send_product_options'];
@@ -381,6 +393,162 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $data['footer'] = $this->load->controller('common/footer');
 
         $this->response->setOutput($this->load->view('extension/payment/robokassa', $data));
+    }
+
+    private function registerMarkingEvents()
+    {
+        $this->load->model('setting/event');
+
+        $events = array(
+            'robokassa_marking_product_form' => array('admin/view/catalog/product_form/after', 'extension/payment/robokassa/productForm'),
+            'robokassa_marking_product_edit' => array('admin/model/catalog/product/editProduct/after', 'extension/payment/robokassa/saveProductMarking'),
+            'robokassa_marking_product_add' => array('admin/model/catalog/product/addProduct/after', 'extension/payment/robokassa/saveProductMarking')
+        );
+
+        foreach ($events as $code => $event) {
+            $this->model_setting_event->deleteEventByCode($code);
+            $this->model_setting_event->addEvent($code, $event[0], $event[1]);
+        }
+    }
+
+    public function productForm(&$route, &$data, &$output)
+    {
+        if (!$this->config->get('payment_robokassa_marking') || $this->config->get('payment_robokassa_country') !== 'RUB') {
+            return;
+        }
+
+        $this->load->language('extension/payment/robokassa');
+        $this->load->model('extension/payment/robokassa');
+        $this->model_extension_payment_robokassa->installMarkingTables();
+
+        $product_id = isset($this->request->get['product_id']) ? (int)$this->request->get['product_id'] : 0;
+        $view_data = array(
+            'entry_marking_required' => $this->language->get('entry_marking_required'),
+            'help_marking_required' => $this->language->get('help_marking_required'),
+            'text_yes' => $this->language->get('text_yes'),
+            'text_no' => $this->language->get('text_no'),
+            'robokassa_marking_required' => $product_id ? $this->model_extension_payment_robokassa->isProductMarkingRequired($product_id) : false
+        );
+
+        $tab_link = '<li><a href="#tab-robokassa-marking" data-toggle="tab">' . $this->language->get('tab_robokassa_marking') . '</a></li>';
+        $tab_html = $this->load->view('extension/payment/robokassa_product_marking', $view_data);
+        $design_tab_link = '<li><a href="#tab-design" data-toggle="tab">' . $data['tab_design'] . '</a></li>';
+
+        $output = str_replace($design_tab_link, $tab_link . "\n" . $design_tab_link, $output);
+        $output = str_replace('<div class="tab-pane" id="tab-design">', $tab_html . "\n" . '<div class="tab-pane" id="tab-design">', $output);
+    }
+
+    public function saveProductMarking(&$route, &$args, &$output)
+    {
+        $product_id = 0;
+
+        if ($route === 'catalog/product/editProduct' && !empty($args[0])) {
+            $product_id = (int)$args[0];
+        } elseif ($route === 'catalog/product/addProduct') {
+            $product_id = (int)$output;
+        }
+
+        if (!$product_id || !isset($this->request->post['robokassa_marking_required'])) {
+            return;
+        }
+
+        $this->load->model('extension/payment/robokassa');
+        $this->model_extension_payment_robokassa->installMarkingTables();
+        $this->model_extension_payment_robokassa->saveProductMarkingRequired($product_id, (bool)$this->request->post['robokassa_marking_required']);
+    }
+
+    public function getOrderProductMarking()
+    {
+        $this->load->language('extension/payment/robokassa');
+        $this->load->model('extension/payment/robokassa');
+        $this->model_extension_payment_robokassa->installMarkingTables();
+        $json = array('success' => false);
+
+        if (!$this->config->get('payment_robokassa_marking') || $this->config->get('payment_robokassa_country') !== 'RUB') {
+            $json['error'] = $this->language->get('error_marking_product');
+        } elseif (!$this->user->hasPermission('access', 'sale/order')) {
+            $json['error'] = $this->language->get('error_marking_permission');
+        } else {
+            $order_product_id = isset($this->request->post['order_product_id']) ? (int)$this->request->post['order_product_id'] : 0;
+            $product = $this->model_extension_payment_robokassa->getOrderProduct($order_product_id);
+
+            if (!$product || !$product['marking_required']) {
+                $json['error'] = $this->language->get('error_marking_product');
+            } else {
+                $json['success'] = true;
+                $json['product'] = array(
+                    'name' => $product['name'],
+                    'quantity' => (int)$product['quantity'],
+                    'codes' => $this->model_extension_payment_robokassa->getOrderProductCodes($order_product_id)
+                );
+            }
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json));
+    }
+
+    public function saveOrderProductMarking()
+    {
+        $this->load->language('extension/payment/robokassa');
+        $this->load->model('extension/payment/robokassa');
+        $this->model_extension_payment_robokassa->installMarkingTables();
+        $json = array('success' => false);
+
+        if (!$this->config->get('payment_robokassa_marking') || $this->config->get('payment_robokassa_country') !== 'RUB') {
+            $json['error'] = $this->language->get('error_marking_product');
+        } elseif (!$this->user->hasPermission('modify', 'sale/order')) {
+            $json['error'] = $this->language->get('error_marking_permission');
+        } else {
+            $order_product_id = isset($this->request->post['order_product_id']) ? (int)$this->request->post['order_product_id'] : 0;
+            $product = $this->model_extension_payment_robokassa->getOrderProduct($order_product_id);
+            $input_codes = isset($this->request->post['codes']) && is_array($this->request->post['codes']) ? $this->request->post['codes'] : array();
+
+            if (!$product || !$product['marking_required']) {
+                $json['error'] = $this->language->get('error_marking_product');
+            } else {
+                $codes = array();
+                $seen = array();
+
+                for ($unit_index = 1; $unit_index <= (int)$product['quantity']; $unit_index++) {
+                    $code = isset($input_codes[$unit_index]) ? (string)$input_codes[$unit_index] : '';
+
+                    if ($code === '') {
+                        $codes[$unit_index] = '';
+                        continue;
+                    }
+
+                    if (strlen($code) > 255 || preg_match('/[^\x1D\x20-\x7E]/', $code) || trim(str_replace(chr(29), '', $code)) === '') {
+                        $json['error'] = sprintf($this->language->get('error_marking_format'), $unit_index);
+                        break;
+                    }
+
+                    $fingerprint = hash('sha256', $code);
+                    if (isset($seen[$fingerprint])) {
+                        $json['error'] = $this->language->get('error_marking_duplicate');
+                        break;
+                    }
+
+                    if ($this->model_extension_payment_robokassa->isCodeUsedInOrder($order_product_id, $code)) {
+                        $json['error'] = $this->language->get('error_marking_duplicate');
+                        break;
+                    }
+
+                    $seen[$fingerprint] = true;
+                    $codes[$unit_index] = $code;
+                }
+
+                if (empty($json['error'])) {
+                    $this->model_extension_payment_robokassa->saveOrderProductCodes($order_product_id, $codes);
+                    $json['success'] = true;
+                    $json['status'] = $this->model_extension_payment_robokassa->getMarkingStatus($order_product_id, $product['quantity']);
+                    $json['message'] = $this->language->get('text_marking_saved');
+                }
+            }
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json));
     }
 
     private function fetchInstallmentAliases($merchant_login)
@@ -512,11 +680,18 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
 	public function install()
 	{
+		$this->load->model('extension/payment/robokassa');
+		$this->model_extension_payment_robokassa->installMarkingTables();
+		$this->registerMarkingEvents();
 		$this->sendPulseStatusChange('enabled');
 	}
 
 	public function uninstall()
 	{
+		$this->load->model('setting/event');
+		$this->model_setting_event->deleteEventByCode('robokassa_marking_product_form');
+		$this->model_setting_event->deleteEventByCode('robokassa_marking_product_edit');
+		$this->model_setting_event->deleteEventByCode('robokassa_marking_product_add');
 		$this->sendPulseStatusChange('disabled');
 	}
 }

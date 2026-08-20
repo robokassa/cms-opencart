@@ -1,0 +1,13 @@
+.robokassa-marking-button {
+    min-width: 120px;
+}
+
+#robokassa-marking-fields {
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+#robokassa-marking-message {
+    min-height: 20px;
+}
