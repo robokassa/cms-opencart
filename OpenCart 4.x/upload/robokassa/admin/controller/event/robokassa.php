@@ -36,6 +36,34 @@ class Robokassa extends \Opencart\System\Engine\Controller
         }, $output);
     }
 
+    public function onAdminMenuBefore(string &$route, array &$data): void
+    {
+        if (!$this->user->hasPermission('access', 'extension/robokassa/payment/robokassa')
+            || empty($data['menus'])
+            || !is_array($data['menus'])) {
+            return;
+        }
+
+        foreach ($data['menus'] as $menu) {
+            if (($menu['id'] ?? '') === 'menu-robokassa') {
+                return;
+            }
+        }
+
+        $robokassa_menu = [
+            'id' => 'menu-robokassa',
+            'icon' => 'fas fa-credit-card',
+            'name' => 'Robokassa',
+            'href' => $this->url->link(
+                'extension/robokassa/payment/robokassa',
+                'user_token=' . $this->session->data['user_token']
+            ),
+            'children' => []
+        ];
+
+        array_splice($data['menus'], 1, 0, [$robokassa_menu]);
+    }
+
     public function onPaymentExtensionViewAfter(&$route, &$args, &$output = null): void
     {
         if (!is_string($output) || $output === '') {
@@ -109,10 +137,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
     public function onOrderInfoViewAfter(string &$route, array &$data, mixed &$output): void
     {
-        if (!$this->config->get('payment_robokassa_marking')
-            || $this->config->get('payment_robokassa_country') !== 'RUB'
-            || !is_string($output)
-            || strpos($output, 'robokassa-marking-card') !== false) {
+        if (!is_string($output)) {
             return;
         }
 
@@ -124,6 +149,19 @@ class Robokassa extends \Opencart\System\Engine\Controller
         }
 
         $this->load->language('extension/robokassa/payment/robokassa');
+        $refund_url = $this->url->link('extension/robokassa/payment/robokassa|refund', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id, true);
+        $refund_button = '<a href="' . $refund_url . '" class="btn btn-danger me-1" title="' . $this->language->get('button_robokassa_refund') . '"><i class="fas fa-undo"></i> ' . $this->language->get('button_robokassa_refund') . '</a>';
+
+        if (strpos($output, $refund_url) === false && preg_match('~<div class="float-end">~', $output)) {
+            $output = (string)preg_replace('~(<div class="float-end">)~', '$1' . $refund_button, $output, 1);
+        }
+
+        if (!$this->config->get('payment_robokassa_marking')
+            || $this->config->get('payment_robokassa_country') !== 'RUB'
+            || strpos($output, 'robokassa-marking-card') !== false) {
+            return;
+        }
+
         $this->load->model('extension/robokassa/payment/robokassa');
         $this->model_extension_robokassa_payment_robokassa->installMarkingTables();
         $products = $this->model_extension_robokassa_payment_robokassa->getOrderProductsForMarking($order_id);

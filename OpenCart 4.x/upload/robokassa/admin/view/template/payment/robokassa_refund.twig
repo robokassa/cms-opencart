@@ -1,0 +1,124 @@
+{{ header }}{{ column_left }}
+<link href="/extension/robokassa/admin/view/stylesheet/robokassa/settings.css" rel="stylesheet" type="text/css">
+<link href="/extension/robokassa/admin/view/stylesheet/robokassa/refund.css" rel="stylesheet" type="text/css">
+<div id="content" class="robokassa-settings robokassa-refund-page">
+  <div class="page-header robokassa-page-header">
+    <div class="container-fluid">
+      <div class="float-end"><a href="{{ back }}" class="btn btn-light"><i class="fas fa-reply"></i> Назад к заказу</a></div>
+      <h1>{{ heading_title }}</h1>
+      <ul class="breadcrumb">
+        {% for breadcrumb in breadcrumbs %}<li class="breadcrumb-item"><a href="{{ breadcrumb.href }}">{{ breadcrumb.text }}</a></li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="container-fluid">
+    {% if success %}<div class="alert alert-success alert-dismissible"><i class="fas fa-check-circle"></i> {{ success }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endif %}
+    {% if error_warning %}<div class="alert alert-danger alert-dismissible"><i class="fas fa-exclamation-circle"></i> {{ error_warning }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endif %}
+    {% if eligibility_error %}<div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> {{ eligibility_error }}</div>{% endif %}
+
+    <div class="robokassa-refund-summary">
+      <div><small>Сумма заказа</small><strong>{{ formatted_order_total }}</strong></div>
+      <div><small>Уже возвращается / возвращено</small><strong>{{ reserved_total|number_format(2, '.', ' ') }} {{ currency_code }}</strong></div>
+      <div class="is-primary"><small>Доступно к возврату</small><strong>{{ formatted_remaining_total }}</strong></div>
+    </div>
+
+    {% if refund_available %}
+      <form action="{{ action }}" method="post" id="robokassa-refund-form">
+        <section class="robokassa-card">
+          <div class="robokassa-card__header"><div><h3>Новый возврат</h3><p>Для полного возврата модуль сам не передаст RefundSum. Частичный возврат отправляется с точной суммой.</p></div></div>
+
+          <div class="robokassa-refund-mode">
+            {% if fiscal_enabled %}
+              <label class="is-active"><input type="radio" name="receipt_mode" value="items" checked> <span><strong>С чеком возврата</strong><small>Выберите позиции, которые возвращает покупатель.</small></span></label>
+            {% endif %}
+            <label class="{% if not fiscal_enabled %}is-active{% endif %}"><input type="radio" name="receipt_mode" value="money" {% if not fiscal_enabled %}checked{% endif %}> <span><strong>Только возврат денег</strong><small>Robokassa не сформирует фискальный чек возврата.</small></span></label>
+          </div>
+
+          {% if fiscal_enabled %}
+            <div id="robokassa-refund-items">
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                  <thead><tr><th>Позиция</th><th class="text-center">Доступно</th><th class="text-end">Цена</th><th style="width:130px">Вернуть</th></tr></thead>
+                  <tbody>
+                    {% for product in products %}
+                      <tr>
+                        <td>
+                          <strong>{{ product.name }}</strong>
+                          {% if product.model %}<small class="robokassa-refund-muted">{{ product.model }}</small>{% endif %}
+                          {% if product.marking_required %}<span class="badge text-bg-info"><i class="fas fa-barcode"></i> Маркировка: {{ product.marking_codes_available }} кодов</span>{% endif %}
+                        </td>
+                        <td class="text-center">{{ product.available_quantity }}</td>
+                        <td class="text-end">{{ product.unit_cost|number_format(2, '.', ' ') }} {{ currency_code }}</td>
+                        <td><input type="number" min="0" max="{{ product.available_quantity }}" step="1" value="0" name="refund_product[{{ product.order_product_id }}]" class="form-control robokassa-refund-quantity" data-cost="{{ product.unit_cost }}"></td>
+                      </tr>
+                    {% endfor %}
+                    {% if shipping and shipping.available %}
+                      <tr>
+                        <td><strong>{{ shipping.title }}</strong><small class="robokassa-refund-muted">Доставка</small></td>
+                        <td class="text-center">1</td>
+                        <td class="text-end">{{ shipping.amount|number_format(2, '.', ' ') }} {{ currency_code }}</td>
+                        <td class="text-center"><input type="checkbox" name="refund_shipping" value="1" class="robokassa-refund-shipping" data-cost="{{ shipping.amount }}"></td>
+                      </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+              <div class="robokassa-inline-note"><i class="fas fa-info-circle"></i><span>Для маркируемых товаров модуль возьмёт свободные DataMatrix-коды и не позволит вернуть один код дважды.</span></div>
+            </div>
+          {% endif %}
+
+          <div class="robokassa-form-grid robokassa-refund-fields">
+            <div class="robokassa-field required">
+              <label for="input-refund-amount">Сумма возврата, {{ currency_code }}</label>
+              <input type="text" name="amount" value="{{ remaining_total|number_format(2, '.', '') }}" id="input-refund-amount" class="form-control" data-remaining="{{ remaining_total }}">
+              <small id="robokassa-refund-type">Полный возврат</small>
+            </div>
+            <div class="robokassa-field">
+              <label for="input-refund-reason">Причина</label>
+              <input type="text" name="reason" value="" maxlength="255" id="input-refund-reason" class="form-control" placeholder="Необязательно">
+            </div>
+          </div>
+
+          <div class="robokassa-refund-submit">
+            <div><i class="fas fa-shield"></i> После отправки заявка будет заблокирована от случайного повтора.</div>
+            <button type="submit" class="btn btn-danger"><i class="fas fa-undo"></i> Выполнить возврат</button>
+          </div>
+        </section>
+      </form>
+    {% endif %}
+
+    <section class="robokassa-card">
+      <div class="robokassa-card__header"><div><h3>История возвратов</h3><p>Статус Robokassa обновляется по кнопке. Возврат выполняется асинхронно.</p></div></div>
+      {% if refunds %}
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover">
+            <thead><tr><th>ID заявки</th><th>Сумма</th><th>Тип</th><th>Статус</th><th>Дата</th><th class="text-end">Действие</th></tr></thead>
+            <tbody>
+              {% for refund in refunds %}
+                <tr data-refund-row="{{ refund.refund_id }}">
+                  <td><code>{{ refund.request_id ?: '—' }}</code>{% if refund.last_error %}<small class="text-danger robokassa-refund-muted">{{ refund.last_error }}</small>{% endif %}</td>
+                  <td>{{ refund.amount|number_format(2, '.', ' ') }} {{ currency_code }}</td>
+                  <td>{% if refund.is_full %}Полный{% else %}Частичный{% endif %}{% if not refund.invoice_items or refund.invoice_items == '[]' %}<small class="robokassa-refund-muted">Без чека</small>{% endif %}</td>
+                  <td><span class="robokassa-refund-status status-{{ refund.status }}">{{ status_labels[refund.status] ?: refund.status }}</span></td>
+                  <td>{{ refund.date_added }}</td>
+                  <td class="text-end">{% if refund.request_id and refund.status not in ['finished', 'canceled'] %}<button type="button" class="btn btn-light robokassa-check-refund" data-refund-id="{{ refund.refund_id }}"><i class="fas fa-refresh"></i> Проверить</button>{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted">По этому заказу возвратов ещё не было.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+<script>
+window.robokassaRefund = {
+  checkUrl: {{ check_url|json_encode|raw }},
+  confirmText: {{ 'Отправить возврат в Robokassa? Отменить созданную заявку из OpenCart нельзя.'|json_encode|raw }}
+};
+</script>
+<script src="/extension/robokassa/admin/view/javascript/robokassa/refund.js" type="text/javascript"></script>
+{{ footer }}

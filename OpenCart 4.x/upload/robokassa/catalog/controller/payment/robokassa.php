@@ -2,6 +2,81 @@
 namespace Opencart\Catalog\Controller\Extension\Robokassa\Payment;
 class Robokassa extends \Opencart\System\Engine\Controller
 {
+    public function refundCron(): void
+    {
+        $this->response->addHeader('Content-Type: application/json');
+        $configured_token = (string)$this->config->get('payment_robokassa_refund_cron_token');
+        $provided_token = isset($this->request->get['token']) && is_scalar($this->request->get['token'])
+            ? (string)$this->request->get['token']
+            : '';
+
+        if ($configured_token === '' || $provided_token === '' || !hash_equals($configured_token, $provided_token)) {
+            $this->response->addHeader('HTTP/1.1 403 Forbidden');
+            $this->response->setOutput(json_encode(array('success' => false, 'error' => 'Forbidden')));
+            return;
+        }
+
+        $this->load->model('extension/robokassa/payment/robokassa_refund');
+
+        if (!$this->model_extension_robokassa_payment_robokassa_refund->acquireLock()) {
+            $this->response->addHeader('HTTP/1.1 409 Conflict');
+            $this->response->setOutput(json_encode(array('success' => false, 'error' => 'Refund sync is already running')));
+            return;
+        }
+
+        $summary = array('success' => true, 'checked' => 0, 'finished' => 0, 'canceled' => 0, 'processing' => 0, 'errors' => 0);
+
+        try {
+            require_once(DIR_EXTENSION . 'robokassa/system/library/robokassa/refund_api.php');
+            $api = new \RobokassaRefundApi(
+                $this->config->get('payment_robokassa_login'),
+                $this->config->get('payment_robokassa_password_2'),
+                $this->config->get('payment_robokassa_password_3')
+            );
+
+            foreach ($this->model_extension_robokassa_payment_robokassa_refund->getPendingRefunds(50) as $refund) {
+                $summary['checked']++;
+                $result = $api->getState($refund['request_id']);
+
+                if (!$result['success']) {
+                    $this->model_extension_robokassa_payment_robokassa_refund->updateState($refund['refund_id'], $refund['status'], $result['raw'], $result['error']);
+                    $summary['errors']++;
+                    continue;
+                }
+
+                $status = isset($result['data']['label']) && is_scalar($result['data']['label'])
+                    ? (string)$result['data']['label']
+                    : '';
+
+                if (!in_array($status, array('processing', 'finished', 'canceled'), true)) {
+                    $this->model_extension_robokassa_payment_robokassa_refund->updateState($refund['refund_id'], 'processing', $result['raw'], 'Robokassa returned an unknown refund status.');
+                    $summary['errors']++;
+                    continue;
+                }
+
+                $state_updated = $this->model_extension_robokassa_payment_robokassa_refund->updateState($refund['refund_id'], $status, $result['raw']);
+                $summary[$status]++;
+
+                if ($state_updated && $status === 'finished') {
+                    $comment = sprintf('Robokassa: возврат %s успешно завершён. ID: %s', number_format((float)$refund['amount'], 2, '.', ''), $refund['request_id']);
+                    $this->model_extension_robokassa_payment_robokassa_refund->recordFinished($refund['order_id'], $comment);
+                } elseif ($state_updated && $status === 'canceled') {
+                    $comment = sprintf('Robokassa: возврат отменён. ID: %s', $refund['request_id']);
+                    $this->model_extension_robokassa_payment_robokassa_refund->recordCanceled($refund['order_id'], $comment);
+                }
+            }
+        } catch (\Throwable $e) {
+            $summary['success'] = false;
+            $summary['error'] = $e->getMessage();
+            $this->log->write('Robokassa refund cron: ' . $e->getMessage());
+            $this->response->addHeader('HTTP/1.1 500 Internal Server Error');
+        }
+
+        $this->model_extension_robokassa_payment_robokassa_refund->releaseLock();
+        $this->response->setOutput(json_encode($summary));
+    }
+
+
     public function index() : string {
         $this->load->language('extension/robokassa/payment/robokassa');
 
@@ -547,5 +622,3 @@ class Robokassa extends \Opencart\System\Engine\Controller
     }
 
 }
-
-

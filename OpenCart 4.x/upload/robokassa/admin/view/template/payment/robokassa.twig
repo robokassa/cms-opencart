@@ -98,6 +98,11 @@
               {% if error_password2 %}<div class="text-danger">{{ error_password2 }}</div>{% endif %}
             </div>
             <div class="robokassa-field">
+              <label for="input-password-3">{{ entry_password3 }}</label>
+              <input type="password" name="payment_robokassa_password_3" value="{{ payment_robokassa_password_3 }}" id="input-password-3" class="form-control" autocomplete="new-password">
+              <small>{{ help_password3 }}</small>
+            </div>
+            <div class="robokassa-field">
               <label for="input-test-password-1">{{ entry_test_password1 }}</label>
               <input type="password" name="payment_robokassa_test_password_1" value="{{ payment_robokassa_test_password_1 }}" id="input-test-password-1" class="form-control" autocomplete="new-password">
             </div>
@@ -235,8 +240,13 @@
             <div class="robokassa-field"><label for="input-sort-order">{{ entry_sort_order }}</label><input type="number" name="payment_robokassa_sort_order" value="{{ payment_robokassa_sort_order }}" id="input-sort-order" class="form-control"></div>
             <div class="robokassa-field"><label for="input-iframe"><span data-bs-toggle="tooltip" title="{{ help_iframe }}">{{ entry_iframe }}</span></label><select name="payment_robokassa_status_iframe" id="input-iframe" class="form-select"><option value="1" {% if payment_robokassa_status_iframe %}selected{% endif %}>{{ text_enabled }}</option><option value="0" {% if not payment_robokassa_status_iframe %}selected{% endif %}>{{ text_disabled }}</option></select></div>
             <div class="robokassa-field"><label for="input-hold"><span data-bs-toggle="tooltip" title="{{ help_hold }}">{{ entry_hold }}</span></label><select name="payment_robokassa_status_hold" id="input-hold" class="form-select"><option value="1" {% if payment_robokassa_status_hold %}selected{% endif %}>{{ text_enabled }}</option><option value="0" {% if not payment_robokassa_status_hold %}selected{% endif %}>{{ text_disabled }}</option></select></div>
+            <div class="robokassa-field"><label for="input-refund-status">Статус после полного возврата</label><select name="payment_robokassa_refund_status_id" id="input-refund-status" class="form-select">{% for order_status in order_statuses %}<option value="{{ order_status.order_status_id }}" {% if order_status.order_status_id == payment_robokassa_refund_status_id %}selected{% endif %}>{{ order_status.name }}</option>{% endfor %}</select><small>При частичном возврате статус заказа не меняется.</small></div>
             <div class="robokassa-field robokassa-field--wide"><label>{{ entry_languages_map }}</label><div class="robokassa-language-grid">{% for language in opencart_languages %}<label><span>{{ language.name }}</span><select class="form-select" name="payment_robokassa_languages_map[{{ language.language_id }}]">{% for robokassa_language in robokassa_available_languages %}<option value="{{ robokassa_language }}" {% if payment_robokassa_languages_map[language.language_id] == robokassa_language %}selected{% endif %}>{{ robokassa_language }}</option>{% endfor %}</select></label>{% endfor %}</div></div>
           </div>
+        </section>
+        <section class="robokassa-card robokassa-card--compact">
+          <div class="robokassa-card__header"><div><h3>Автоматическая проверка возвратов</h3><p>Добавьте этот URL в cron с интервалом около 5 минут.</p></div></div>
+          <div class="robokassa-url-list"><div><span>Refund cron <small>GET</small></span><code id="robokassa-refund-cron-url">{{ payment_robokassa_refund_cron_url }}</code><div class="robokassa-url-actions"><button type="button" data-copy-url="{{ payment_robokassa_refund_cron_copy_url }}" title="Скопировать полный URL"><i class="fas fa-copy"></i></button><button type="button" data-regenerate-url="{{ payment_robokassa_refund_cron_regenerate_url }}" data-confirm="Старый cron URL перестанет работать. Новый URL будет скопирован — не забудьте обновить cron. Продолжить?" title="Создать новый токен"><i class="fas fa-sync-alt"></i></button></div></div></div>
         </section>
       </div>
 

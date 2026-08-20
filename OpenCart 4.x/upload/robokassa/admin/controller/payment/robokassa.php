@@ -17,6 +17,13 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $this->model_extension_robokassa_payment_robokassa->installMarkingTables();
         $this->registerEvents();
 
+        $refund_cron_token = (string)$this->config->get('payment_robokassa_refund_cron_token');
+
+        if ($refund_cron_token === '') {
+            $refund_cron_token = $this->generateRefundCronToken();
+            $this->saveRefundCronToken($refund_cron_token);
+        }
+
         if ($this->request->server['REQUEST_METHOD'] !== 'POST') {
             $this->syncExtraPaymentControllers($this->getStoredInstallmentAliases(), $this->getStoredInstallmentLabels());
         }
@@ -119,6 +126,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $data['entry_login'] = $this->language->get('entry_login');
         $data['entry_password1'] = $this->language->get('entry_password1');
         $data['entry_password2'] = $this->language->get('entry_password2');
+        $data['entry_password3'] = $this->language->get('entry_password3');
         $data['entry_test_password1'] = $this->language->get('entry_test_password1');
         $data['entry_test_password2'] = $this->language->get('entry_test_password2');
         $data['entry_result_url'] = $this->language->get('entry_result_url');
@@ -137,6 +145,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $data['help_marking'] = $this->language->get('help_marking');
         $data['help_iframe'] = $this->language->get('help_iframe');
         $data['help_hold'] = $this->language->get('help_hold');
+        $data['help_password3'] = $this->language->get('help_password3');
 
         $data['action'] = $this->url->link('extension/robokassa/payment/robokassa', 'user_token=' . $this->session->data['user_token'], true);
         $data['cancel'] = $this->url->link('marketplace/extension', 'user_token=' . $this->session->data['user_token'] . '&type=payment', true);
@@ -146,6 +155,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $data['payment_robokassa_login'] = $this->request->post['payment_robokassa_login'] ?? $this->config->get('payment_robokassa_login');
         $data['payment_robokassa_password_1'] = $this->request->post['payment_robokassa_password_1'] ?? $this->config->get('payment_robokassa_password_1');
         $data['payment_robokassa_password_2'] = $this->request->post['payment_robokassa_password_2'] ?? $this->config->get('payment_robokassa_password_2');
+        $data['payment_robokassa_password_3'] = $this->request->post['payment_robokassa_password_3'] ?? $this->config->get('payment_robokassa_password_3');
         $data['payment_robokassa_test_password_1'] = $this->request->post['payment_robokassa_test_password_1'] ?? $this->config->get('payment_robokassa_test_password_1');
         $data['payment_robokassa_test_password_2'] = $this->request->post['payment_robokassa_test_password_2'] ?? $this->config->get('payment_robokassa_test_password_2');
 
@@ -172,6 +182,9 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $data['payment_robokassa_result_method'] = 'POST';
         $data['payment_robokassa_success_method'] = 'GET';
         $data['payment_robokassa_fail_method'] = 'POST';
+        $data['payment_robokassa_refund_cron_url'] = $this->maskRefundCronUrl($this->getRefundCronUrl($refund_cron_token));
+        $data['payment_robokassa_refund_cron_copy_url'] = $this->url->link('extension/robokassa/payment/robokassa|copyRefundCronUrl', 'user_token=' . $this->session->data['user_token'], true);
+        $data['payment_robokassa_refund_cron_regenerate_url'] = $this->url->link('extension/robokassa/payment/robokassa|regenerateRefundCronToken', 'user_token=' . $this->session->data['user_token'], true);
 
         $data['payment_robokassa_test'] = $this->request->post['payment_robokassa_test'] ?? $this->config->get('payment_robokassa_test');
         $data['payment_robokassa_mokka_status'] = $this->request->post['payment_robokassa_mokka_status'] ?? $this->config->get('payment_robokassa_mokka_status');
@@ -303,6 +316,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $this->load->model('localisation/order_status');
         $data['order_statuses'] = $this->model_localisation_order_status->getOrderStatuses();
+        $data['payment_robokassa_refund_status_id'] = (int)($this->request->post['payment_robokassa_refund_status_id'] ?? ($this->config->get('payment_robokassa_refund_status_id') ?: 11));
 
         $data['payment_robokassa_geo_zone_id'] = $this->request->post['payment_robokassa_geo_zone_id'] ?? $this->config->get('payment_robokassa_geo_zone_id');
 
@@ -413,6 +427,293 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $this->response->addHeader('Content-Type: application/json');
         $this->response->setOutput(json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
+
+    public function refund(): void
+    {
+        $this->load->language('extension/robokassa/payment/robokassa');
+
+        if (!$this->user->hasPermission('access', 'extension/robokassa/payment/robokassa')) {
+            $this->session->data['error_warning'] = $this->language->get('error_refund_permission');
+            $this->response->redirect($this->url->link('common/dashboard', 'user_token=' . $this->session->data['user_token'], true));
+            return;
+        }
+
+        $this->load->model('sale/order');
+        $this->load->model('extension/robokassa/payment/robokassa');
+        $this->model_extension_robokassa_payment_robokassa->installMarkingTables();
+
+        $order_id = isset($this->request->get['order_id']) ? (int)$this->request->get['order_id'] : 0;
+        $order_info = $this->model_sale_order->getOrder($order_id);
+
+        if (!$order_info) {
+            $this->session->data['error_warning'] = $this->language->get('error_refund_order');
+            $this->response->redirect($this->url->link('sale/order', 'user_token=' . $this->session->data['user_token'], true));
+            return;
+        }
+
+        $eligibility_error = $this->getRefundEligibilityError($order_info, false);
+
+        if ($this->request->server['REQUEST_METHOD'] === 'POST') {
+            $error = $this->getRefundEligibilityError($order_info, true);
+
+            if ($error === '') {
+                $error = $this->submitRefund($order_info);
+            }
+
+            if ($error !== '') {
+                $this->session->data['error_warning'] = $error;
+            }
+
+            $this->response->redirect($this->url->link('extension/robokassa/payment/robokassa|refund', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id, true));
+            return;
+        }
+
+        $this->document->setTitle(sprintf($this->language->get('heading_refund'), $order_id));
+        $data['heading_title'] = sprintf($this->language->get('heading_refund'), $order_id);
+        $data['breadcrumbs'] = array(
+            array('text' => $this->language->get('text_home'), 'href' => $this->url->link('common/dashboard', 'user_token=' . $this->session->data['user_token'], true)),
+            array('text' => $this->language->get('text_order'), 'href' => $this->url->link('sale/order', 'user_token=' . $this->session->data['user_token'], true)),
+            array('text' => $data['heading_title'], 'href' => $this->url->link('extension/robokassa/payment/robokassa|refund', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id, true))
+        );
+        $data['action'] = $this->url->link('extension/robokassa/payment/robokassa|refund', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id, true);
+        $data['back'] = $this->url->link('sale/order|info', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id, true);
+        $data['check_url'] = str_replace('&amp;', '&', $this->url->link('extension/robokassa/payment/robokassa|checkRefund', 'user_token=' . $this->session->data['user_token'], true));
+        $data['order_id'] = $order_id;
+        $data['order_info'] = $order_info;
+        $data['currency_code'] = $order_info['currency_code'];
+        $data['order_total'] = round((float)$order_info['total'], 2);
+        $data['reserved_total'] = round($this->model_extension_robokassa_payment_robokassa->getReservedRefundTotal($order_id), 2);
+        $data['remaining_total'] = max(0, round($data['order_total'] - $data['reserved_total'], 2));
+        $data['formatted_order_total'] = $this->currency->format($data['order_total'], $order_info['currency_code'], $order_info['currency_value']);
+        $data['formatted_remaining_total'] = $this->currency->format($data['remaining_total'], $order_info['currency_code'], $order_info['currency_value']);
+        $data['refund_available'] = $eligibility_error === '' && $data['remaining_total'] > 0;
+        $data['eligibility_error'] = $eligibility_error;
+        $data['fiscal_enabled'] = (bool)$this->config->get('payment_robokassa_fiscal');
+        $refundable = $this->model_extension_robokassa_payment_robokassa->getRefundableData($order_id);
+        $data['products'] = $refundable['products'];
+        $data['shipping'] = $refundable['shipping'];
+        $data['refunds'] = $this->model_extension_robokassa_payment_robokassa->getRefunds($order_id);
+        $data['status_labels'] = array(
+            'submitting' => $this->language->get('text_refund_submitting'),
+            'unknown' => $this->language->get('text_refund_unknown'),
+            'processing' => $this->language->get('text_refund_processing'),
+            'finished' => $this->language->get('text_refund_finished'),
+            'canceled' => $this->language->get('text_refund_canceled'),
+            'failed' => $this->language->get('text_refund_failed')
+        );
+        $data['error_warning'] = isset($this->session->data['error_warning']) ? $this->session->data['error_warning'] : '';
+        $data['success'] = isset($this->session->data['success']) ? $this->session->data['success'] : '';
+        unset($this->session->data['error_warning'], $this->session->data['success']);
+        $data['header'] = $this->load->controller('common/header');
+        $data['column_left'] = $this->load->controller('common/column_left');
+        $data['footer'] = $this->load->controller('common/footer');
+
+        $this->response->setOutput($this->load->view('extension/robokassa/payment/robokassa_refund', $data));
+    }
+
+    public function checkRefund(): void
+    {
+        $this->load->language('extension/robokassa/payment/robokassa');
+        $this->load->model('extension/robokassa/payment/robokassa');
+        $this->model_extension_robokassa_payment_robokassa->installMarkingTables();
+        $json = array('success' => false);
+
+        if (!$this->user->hasPermission('modify', 'extension/robokassa/payment/robokassa')) {
+            $json['error'] = $this->language->get('error_refund_permission');
+        } else {
+            $refund_id = isset($this->request->post['refund_id']) ? (int)$this->request->post['refund_id'] : 0;
+            $refund = $this->model_extension_robokassa_payment_robokassa->getRefund($refund_id);
+
+            if (!$refund || !$refund['request_id']) {
+                $json['error'] = $this->language->get('error_refund_not_found');
+            } elseif (in_array($refund['status'], array('finished', 'canceled'), true)) {
+                $json = array('success' => true, 'status' => $refund['status']);
+            } else {
+                $api = $this->getRefundApi();
+                $result = $api->getState($refund['request_id']);
+
+                if (!$result['success']) {
+                    $this->model_extension_robokassa_payment_robokassa->updateRefundState($refund_id, $refund['status'] === 'unknown' ? 'unknown' : 'processing', $result['raw'], $result['error']);
+                    $json['error'] = $result['error'];
+                } else {
+                    $status = isset($result['data']['label']) && is_scalar($result['data']['label']) ? (string)$result['data']['label'] : '';
+
+                    if (!in_array($status, array('processing', 'finished', 'canceled'), true)) {
+                        $json['error'] = $this->language->get('error_refund_state');
+                    } else {
+                        $state_updated = $this->model_extension_robokassa_payment_robokassa->updateRefundState($refund_id, $status, $result['raw']);
+
+                        if ($state_updated && $status !== $refund['status'] && $status === 'finished') {
+                            $this->model_extension_robokassa_payment_robokassa->recordFinishedRefund(
+                                $refund['order_id'],
+                                sprintf($this->language->get('note_refund_finished'), $refund['amount'], $refund['request_id'])
+                            );
+                        } elseif ($state_updated && $status !== $refund['status'] && $status === 'canceled') {
+                            $this->model_extension_robokassa_payment_robokassa->addOrderNote($refund['order_id'], sprintf($this->language->get('note_refund_canceled'), $refund['request_id']));
+                        }
+
+                        $json = array('success' => true, 'status' => $status);
+                    }
+                }
+            }
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json));
+    }
+
+    private function submitRefund(array $order_info)
+    {
+        $order_id = (int)$order_info['order_id'];
+        $remaining = max(0, round((float)$order_info['total'] - $this->model_extension_robokassa_payment_robokassa->getReservedRefundTotal($order_id), 2));
+        $receipt_mode = (bool)$this->config->get('payment_robokassa_fiscal')
+            && isset($this->request->post['receipt_mode'])
+            && $this->request->post['receipt_mode'] === 'items';
+        $invoice_items = array();
+        $allocations = array();
+
+        if ($receipt_mode) {
+            try {
+                $built = $this->model_extension_robokassa_payment_robokassa->buildRefundInvoiceItems(
+                    $order_id,
+                    isset($this->request->post['refund_product']) && is_array($this->request->post['refund_product']) ? $this->request->post['refund_product'] : array(),
+                    !empty($this->request->post['refund_shipping'])
+                );
+            } catch (\Exception $e) {
+                return $e->getMessage();
+            }
+
+            $amount = $built['amount'];
+            $invoice_items = $built['invoice_items'];
+            $allocations = $built['allocations'];
+        } else {
+            $amount_value = isset($this->request->post['amount']) && is_scalar($this->request->post['amount'])
+                ? str_replace(',', '.', (string)$this->request->post['amount'])
+                : '';
+
+            if (!is_numeric($amount_value)) {
+                return $this->language->get('error_refund_amount');
+            }
+
+            $amount = round((float)$amount_value, 2);
+        }
+
+        if ($amount <= 0 || $amount > $remaining + 0.005) {
+            return sprintf($this->language->get('error_refund_amount_available'), number_format($remaining, 2, '.', ''));
+        }
+
+        $reason = isset($this->request->post['reason']) && is_scalar($this->request->post['reason'])
+            ? mb_substr(trim(strip_tags((string)$this->request->post['reason'])), 0, 255, 'UTF-8')
+            : '';
+        $is_full = abs($amount - $remaining) <= 0.005;
+        $api = $this->getRefundApi();
+        $operation = $api->getOperationKey($order_id);
+
+        if (!$operation['success']) {
+            return $operation['error'];
+        }
+
+        $fingerprint = hash('sha256', implode('|', array(
+            $order_id,
+            number_format($amount, 2, '.', ''),
+            $reason,
+            json_encode($invoice_items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        )));
+        $reservation = $this->model_extension_robokassa_payment_robokassa->reserveRefund(
+            $order_id,
+            $operation['operation_key'],
+            $fingerprint,
+            $amount,
+            $is_full,
+            $reason,
+            $invoice_items,
+            $allocations,
+            (float)$order_info['total']
+        );
+
+        if (!$reservation['success']) {
+            return $reservation['error'];
+        }
+
+        $result = $api->create($operation['operation_key'], $is_full ? null : $amount, $invoice_items);
+
+        if (!$result['success']) {
+            $status = $result['uncertain'] ? 'unknown' : 'failed';
+            $this->model_extension_robokassa_payment_robokassa->failRefundSubmission($reservation['refund_id'], $status, $result['error'], $result['raw']);
+
+            if ($status === 'unknown') {
+                $this->model_extension_robokassa_payment_robokassa->addOrderNote($order_id, $this->language->get('note_refund_unknown'));
+            }
+
+            return $result['error'] . ($status === 'unknown' ? ' ' . $this->language->get('error_refund_unknown_retry') : '');
+        }
+
+        $response = $result['data'];
+
+        $request_id_valid = !empty($response['requestId'])
+            && is_scalar($response['requestId'])
+            && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string)$response['requestId']);
+
+        if (empty($response['success']) || !$request_id_valid) {
+            $message = !empty($response['message']) && is_scalar($response['message']) ? (string)$response['message'] : $this->language->get('error_refund_rejected');
+            $status = !empty($response['success']) ? 'unknown' : 'failed';
+            $this->model_extension_robokassa_payment_robokassa->failRefundSubmission($reservation['refund_id'], $status, $message, $result['raw']);
+
+            if ($status === 'unknown') {
+                $this->model_extension_robokassa_payment_robokassa->addOrderNote($order_id, $this->language->get('note_refund_unknown'));
+            }
+
+            return $message . ($status === 'unknown' ? ' ' . $this->language->get('error_refund_unknown_retry') : '');
+        }
+
+        $request_id = (string)$response['requestId'];
+        $this->model_extension_robokassa_payment_robokassa->completeRefundSubmission($reservation['refund_id'], $request_id, $result['raw']);
+        $this->model_extension_robokassa_payment_robokassa->addOrderNote($order_id, sprintf($this->language->get('note_refund_created'), number_format($amount, 2, '.', ''), $request_id, $invoice_items ? '' : ' ' . $this->language->get('text_refund_without_receipt')));
+        $this->session->data['success'] = sprintf($this->language->get('success_refund_created'), $request_id);
+
+        return '';
+    }
+
+    private function getRefundEligibilityError(array $order_info, $modify)
+    {
+        if (!$this->user->hasPermission($modify ? 'modify' : 'access', 'extension/robokassa/payment/robokassa')) {
+            return $this->language->get('error_refund_permission');
+        }
+
+        if (empty($order_info['payment_code']) || strpos((string)$order_info['payment_code'], 'robokassa') !== 0) {
+            return $this->language->get('error_refund_payment');
+        }
+
+        if ($this->config->get('payment_robokassa_country') !== 'RUB') {
+            return $this->language->get('error_refund_country');
+        }
+
+        if (strtoupper((string)$order_info['currency_code']) !== 'RUB') {
+            return $this->language->get('error_refund_currency');
+        }
+
+        if ($this->config->get('payment_robokassa_test')) {
+            return $this->language->get('error_refund_test');
+        }
+
+        if (trim((string)$this->config->get('payment_robokassa_password_3')) === '') {
+            return $this->language->get('error_refund_password3');
+        }
+
+        return '';
+    }
+
+    private function getRefundApi()
+    {
+        require_once(DIR_EXTENSION . 'robokassa/system/library/robokassa/refund_api.php');
+
+        return new \RobokassaRefundApi(
+            $this->config->get('payment_robokassa_login'),
+            $this->config->get('payment_robokassa_password_2'),
+            $this->config->get('payment_robokassa_password_3')
+        );
+    }
+
 
     private function validate(): bool
     {
@@ -551,11 +852,83 @@ class Robokassa extends \Opencart\System\Engine\Controller
             }
         }
 
+        $main_settings['payment_robokassa_refund_cron_token'] = (string)$this->config->get('payment_robokassa_refund_cron_token');
+
         $this->saveSettingDirect('payment_robokassa', $main_settings, $store_id);
 
         foreach ($grouped_settings as $code => $values) {
             $this->saveSettingDirect($code, array_merge($this->getSettingDirect($code, $store_id), $values), $store_id);
         }
+    }
+
+    private function generateRefundCronToken(): string
+    {
+        return bin2hex(random_bytes(24));
+    }
+
+    private function saveRefundCronToken(string $token): void
+    {
+        $this->db->query("DELETE FROM `" . DB_PREFIX . "setting` WHERE `store_id` = '0' AND `key` = 'payment_robokassa_refund_cron_token'");
+        $this->db->query("INSERT INTO `" . DB_PREFIX . "setting` SET `store_id` = '0', `code` = 'payment_robokassa', `key` = 'payment_robokassa_refund_cron_token', `value` = '" . $this->db->escape($token) . "', `serialized` = '0'");
+        $this->config->set('payment_robokassa_refund_cron_token', $token);
+    }
+
+    private function getRefundCronUrl(string $token): string
+    {
+        return HTTP_CATALOG . 'index.php?route=extension/robokassa/payment/robokassa|refundCron&token=' . rawurlencode($token);
+    }
+
+    private function maskRefundCronUrl(string $url): string
+    {
+        return (string)preg_replace('/([?&]token=)[^&]*/', '$1••••••••••••', $url);
+    }
+
+    public function copyRefundCronUrl(): void
+    {
+        $json = [];
+
+        if (!$this->user->hasPermission('access', 'extension/robokassa/payment/robokassa')) {
+            $this->response->addHeader('HTTP/1.1 403 Forbidden');
+            $json['error'] = 'Недостаточно прав для просмотра cron URL.';
+        } else {
+            $token = (string)$this->config->get('payment_robokassa_refund_cron_token');
+
+            if ($token === '') {
+                $token = $this->generateRefundCronToken();
+                $this->saveRefundCronToken($token);
+            }
+
+            $json['success'] = true;
+            $json['url'] = $this->getRefundCronUrl($token);
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->addHeader('Cache-Control: no-store, no-cache, must-revalidate');
+        $this->response->setOutput(json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    public function regenerateRefundCronToken(): void
+    {
+        $json = [];
+
+        if ($this->request->server['REQUEST_METHOD'] !== 'POST') {
+            $this->response->addHeader('HTTP/1.1 405 Method Not Allowed');
+            $json['error'] = 'Метод не поддерживается.';
+        } elseif (!$this->user->hasPermission('modify', 'extension/robokassa/payment/robokassa')) {
+            $this->response->addHeader('HTTP/1.1 403 Forbidden');
+            $json['error'] = 'Недостаточно прав для обновления cron-токена.';
+        } else {
+            $token = $this->generateRefundCronToken();
+            $this->saveRefundCronToken($token);
+            $url = $this->getRefundCronUrl($token);
+            $json['success'] = true;
+            $json['url'] = $url;
+            $json['display'] = $this->maskRefundCronUrl($url);
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->addHeader('Cache-Control: no-store, no-cache, must-revalidate');
+        $this->response->setOutput(json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     private function fetchInstallmentAliases(string $merchant_login)
@@ -820,6 +1193,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
             'robokassa_marking_variant_add_after',
             'robokassa_marking_variant_edit_after',
             'robokassa_marking_order_info_after',
+            'robokassa_admin_menu_before',
         ];
 
         foreach ($codes as $code) {
@@ -971,6 +1345,14 @@ class Robokassa extends \Opencart\System\Engine\Controller
                 'status'      => 1,
                 'sort_order'  => 17
             ],
+            [
+                'code'        => 'robokassa_admin_menu_before',
+                'description' => 'Robokassa shortcut in admin menu',
+                'trigger'     => 'admin/view/common/column_left/before',
+                'action'      => 'extension/robokassa/event/robokassa|onAdminMenuBefore',
+                'status'      => 1,
+                'sort_order'  => 18
+            ],
         ];
 
         foreach ($events as $event) {
@@ -1001,6 +1383,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
             'robokassa_marking_variant_add_after',
             'robokassa_marking_variant_edit_after',
             'robokassa_marking_order_info_after',
+            'robokassa_admin_menu_before',
         ];
 
         foreach ($codes as $code) {
