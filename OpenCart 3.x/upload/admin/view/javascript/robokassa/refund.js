@@ -9,6 +9,11 @@
 
   function refreshAmount() {
     var $amount = $('#input-refund-amount');
+
+    if (!$amount.length) {
+      return;
+    }
+
     var remaining = parseFloat($amount.data('remaining')) || 0;
 
     if (isItemsMode()) {
@@ -27,7 +32,7 @@
       $amount.prop('readonly', false);
     }
 
-    var amount = parseFloat($amount.val().replace(',', '.')) || 0;
+    var amount = parseFloat(String($amount.val() || '').replace(',', '.')) || 0;
     $('#robokassa-refund-type').text(Math.abs(amount - remaining) <= 0.005 ? 'Полный возврат' : 'Частичный возврат');
   }
 
