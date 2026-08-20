@@ -1,0 +1,12 @@
+#robokassa-marking-card .robokassa-marking-button {
+    min-width: 150px;
+}
+
+#robokassa-marking-modal .modal-body {
+    max-height: 65vh;
+    overflow-y: auto;
+}
+
+#robokassa-marking-modal .robokassa-marking-input {
+    font-family: monospace;
+}

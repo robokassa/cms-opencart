@@ -13,6 +13,9 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $this->load->model('setting/setting');
         $this->load->model('localisation/language');
+        $this->load->model('extension/robokassa/payment/robokassa');
+        $this->model_extension_robokassa_payment_robokassa->installMarkingTables();
+        $this->registerEvents();
 
         if ($this->request->server['REQUEST_METHOD'] !== 'POST') {
             $this->syncExtraPaymentControllers($this->getStoredInstallmentAliases(), $this->getStoredInstallmentLabels());
@@ -106,6 +109,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $data['entry_payment_method'] = $this->language->get('entry_payment_method');
         $data['entry_payment_object'] = $this->language->get('entry_payment_object');
         $data['entry_fiscal'] = $this->language->get('entry_fiscal');
+        $data['entry_marking'] = $this->language->get('entry_marking');
         $data['text_yes'] = $this->language->get('text_yes');
         $data['text_no'] = $this->language->get('text_no');
         $data['text_kz'] = $this->language->get('text_kz');
@@ -130,6 +134,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $data['entry_hold'] = $this->language->get('entry_hold');
 
         $data['help_fiscal'] = $this->language->get('help_fiscal');
+        $data['help_marking'] = $this->language->get('help_marking');
         $data['help_iframe'] = $this->language->get('help_iframe');
         $data['help_hold'] = $this->language->get('help_hold');
 
@@ -259,11 +264,13 @@ class Robokassa extends \Opencart\System\Engine\Controller
             'agent_commission' => 'агентское вознаграждение',
             'composite' => 'составной предмет расчета',
             'another' => 'иной предмет расчета',
+            'tovar_mark' => 'маркируемый товар с кодом маркировки',
         ];
 
         $data['payment_robokassa_tax_type'] = $this->request->post['payment_robokassa_tax_type'] ?? $this->config->get('payment_robokassa_tax_type');
         $data['payment_robokassa_tax'] = $this->request->post['payment_robokassa_tax'] ?? $this->config->get('payment_robokassa_tax');
         $data['payment_robokassa_fiscal'] = $this->request->post['payment_robokassa_fiscal'] ?? $this->config->get('payment_robokassa_fiscal');
+        $data['payment_robokassa_marking'] = $this->request->post['payment_robokassa_marking'] ?? $this->config->get('payment_robokassa_marking');
         $data['payment_robokassa_payment_method'] = $this->request->post['payment_robokassa_payment_method'] ?? $this->config->get('payment_robokassa_payment_method');
         $data['payment_robokassa_payment_object'] = $this->request->post['payment_robokassa_payment_object'] ?? $this->config->get('payment_robokassa_payment_object');
 
@@ -288,6 +295,99 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $data['footer'] = $this->load->controller('common/footer');
 
         $this->response->setOutput($this->load->view('extension/robokassa/payment/robokassa', $data));
+    }
+
+    public function getOrderProductMarking(): void
+    {
+        $this->load->language('extension/robokassa/payment/robokassa');
+        $json = [];
+
+        if (!$this->user->hasPermission('access', 'extension/robokassa/payment/robokassa')) {
+            $json['error'] = $this->language->get('error_marking_permission');
+        } elseif (!$this->config->get('payment_robokassa_marking') || $this->config->get('payment_robokassa_country') !== 'RUB') {
+            $json['error'] = $this->language->get('error_marking_disabled');
+        } else {
+            $order_product_id = (int)($this->request->post['order_product_id'] ?? 0);
+            $this->load->model('extension/robokassa/payment/robokassa');
+            $this->model_extension_robokassa_payment_robokassa->installMarkingTables();
+            $product = $this->model_extension_robokassa_payment_robokassa->getOrderProduct($order_product_id);
+
+            if (!$product || !(int)$product['marking_required']) {
+                $json['error'] = $this->language->get('error_marking_product');
+            } else {
+                $json['success'] = true;
+                $json['product'] = [
+                    'name' => (string)$product['name'],
+                    'quantity' => (int)$product['quantity'],
+                    'codes' => $this->model_extension_robokassa_payment_robokassa->getOrderProductCodes($order_product_id)
+                ];
+            }
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    public function saveOrderProductMarking(): void
+    {
+        $this->load->language('extension/robokassa/payment/robokassa');
+        $json = [];
+
+        if (!$this->user->hasPermission('modify', 'extension/robokassa/payment/robokassa')) {
+            $json['error'] = $this->language->get('error_marking_permission');
+        } elseif (!$this->config->get('payment_robokassa_marking') || $this->config->get('payment_robokassa_country') !== 'RUB') {
+            $json['error'] = $this->language->get('error_marking_disabled');
+        } else {
+            $order_product_id = (int)($this->request->post['order_product_id'] ?? 0);
+            $submitted_codes = isset($this->request->post['codes']) && is_array($this->request->post['codes'])
+                ? $this->request->post['codes']
+                : [];
+
+            $this->load->model('extension/robokassa/payment/robokassa');
+            $this->model_extension_robokassa_payment_robokassa->installMarkingTables();
+            $product = $this->model_extension_robokassa_payment_robokassa->getOrderProduct($order_product_id);
+
+            if (!$product || !(int)$product['marking_required']) {
+                $json['error'] = $this->language->get('error_marking_product');
+            } else {
+                $codes = [];
+                $seen = [];
+
+                for ($unit_index = 1; $unit_index <= (int)$product['quantity']; $unit_index++) {
+                    $code = isset($submitted_codes[$unit_index]) ? (string)$submitted_codes[$unit_index] : '';
+
+                    if ($code === '') {
+                        $codes[$unit_index] = '';
+                        continue;
+                    }
+
+                    if (strlen($code) > 255 || preg_match('/[^\x1D\x20-\x7E]/', $code) || trim(str_replace(chr(29), '', $code)) === '') {
+                        $json['error'] = sprintf($this->language->get('error_marking_format'), $unit_index);
+                        break;
+                    }
+
+                    $fingerprint = hash('sha256', $code);
+
+                    if (isset($seen[$fingerprint]) || $this->model_extension_robokassa_payment_robokassa->isCodeUsedInOrder($order_product_id, $code)) {
+                        $json['error'] = $this->language->get('error_marking_duplicate');
+                        break;
+                    }
+
+                    $seen[$fingerprint] = true;
+                    $codes[$unit_index] = $code;
+                }
+
+                if (!isset($json['error'])) {
+                    $this->model_extension_robokassa_payment_robokassa->saveOrderProductCodes($order_product_id, $codes);
+                    $json['success'] = true;
+                    $json['status'] = $this->model_extension_robokassa_payment_robokassa->getMarkingStatus($order_product_id, (int)$product['quantity']);
+                    $json['message'] = $this->language->get('text_marking_saved');
+                }
+            }
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     private function validate(): bool
@@ -471,6 +571,9 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
     public function install(): void
     {
+        $this->load->model('extension/robokassa/payment/robokassa');
+        $this->model_extension_robokassa_payment_robokassa->installMarkingTables();
+
         $this->load->model('user/user_group');
         $route = 'extension/robokassa/event/robokassa';
         $this->model_user_user_group->addPermission($this->user->getGroupId(), 'access', $route);
@@ -635,6 +738,12 @@ class Robokassa extends \Opencart\System\Engine\Controller
             'robokassa_payment_method_graph_after_pipe',
             'robokassa_admin_payment_extension_after_dot',
             'robokassa_admin_payment_extension_after_pipe',
+            'robokassa_marking_product_form_after',
+            'robokassa_marking_product_add_after',
+            'robokassa_marking_product_edit_after',
+            'robokassa_marking_variant_add_after',
+            'robokassa_marking_variant_edit_after',
+            'robokassa_marking_order_info_after',
         ];
 
         foreach ($codes as $code) {
@@ -738,6 +847,54 @@ class Robokassa extends \Opencart\System\Engine\Controller
                 'status'      => 1,
                 'sort_order'  => 11
             ],
+            [
+                'code'        => 'robokassa_marking_product_form_after',
+                'description' => 'Robokassa marking field in product form',
+                'trigger'     => 'admin/view/catalog/product_form/after',
+                'action'      => 'extension/robokassa/event/robokassa|onProductFormViewAfter',
+                'status'      => 1,
+                'sort_order'  => 12
+            ],
+            [
+                'code'        => 'robokassa_marking_product_add_after',
+                'description' => 'Robokassa marking save after product add',
+                'trigger'     => 'admin/model/catalog/product/addProduct/after',
+                'action'      => 'extension/robokassa/event/robokassa|onProductAddAfter',
+                'status'      => 1,
+                'sort_order'  => 13
+            ],
+            [
+                'code'        => 'robokassa_marking_product_edit_after',
+                'description' => 'Robokassa marking save after product edit',
+                'trigger'     => 'admin/model/catalog/product/editProduct/after',
+                'action'      => 'extension/robokassa/event/robokassa|onProductEditAfter',
+                'status'      => 1,
+                'sort_order'  => 14
+            ],
+            [
+                'code'        => 'robokassa_marking_variant_add_after',
+                'description' => 'Robokassa marking save after variant add',
+                'trigger'     => 'admin/model/catalog/product/addVariant/after',
+                'action'      => 'extension/robokassa/event/robokassa|onProductAddAfter',
+                'status'      => 1,
+                'sort_order'  => 15
+            ],
+            [
+                'code'        => 'robokassa_marking_variant_edit_after',
+                'description' => 'Robokassa marking save after variant edit',
+                'trigger'     => 'admin/model/catalog/product/editVariant/after',
+                'action'      => 'extension/robokassa/event/robokassa|onProductEditAfter',
+                'status'      => 1,
+                'sort_order'  => 16
+            ],
+            [
+                'code'        => 'robokassa_marking_order_info_after',
+                'description' => 'Robokassa marking controls in order info',
+                'trigger'     => 'admin/view/sale/order_info/after',
+                'action'      => 'extension/robokassa/event/robokassa|onOrderInfoViewAfter',
+                'status'      => 1,
+                'sort_order'  => 17
+            ],
         ];
 
         foreach ($events as $event) {
@@ -762,6 +919,12 @@ class Robokassa extends \Opencart\System\Engine\Controller
             'robokassa_payment_method_graph_after_pipe',
             'robokassa_admin_payment_extension_after_dot',
             'robokassa_admin_payment_extension_after_pipe',
+            'robokassa_marking_product_form_after',
+            'robokassa_marking_product_add_after',
+            'robokassa_marking_product_edit_after',
+            'robokassa_marking_variant_add_after',
+            'robokassa_marking_variant_edit_after',
+            'robokassa_marking_order_info_after',
         ];
 
         foreach ($codes as $code) {

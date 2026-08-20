@@ -1,0 +1,73 @@
+<link href="extension/robokassa/admin/view/stylesheet/robokassa/marking.css" rel="stylesheet" type="text/css"/>
+<div class="card mb-3" id="robokassa-marking-card">
+  <div class="card-header"><i class="fas fa-barcode"></i> {{ heading_marking }}</div>
+  <div class="card-body">
+    {% if incomplete %}
+      <div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> {{ warning_marking_incomplete }}</div>
+    {% endif %}
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover">
+        <thead>
+          <tr>
+            <td class="text-start">{{ column_product }}</td>
+            <td class="text-end">{{ column_quantity }}</td>
+            <td class="text-center">{{ column_marking }}</td>
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in products %}
+            <tr>
+              <td class="text-start">{{ product.name }}</td>
+              <td class="text-end">{{ product.quantity }}</td>
+              <td class="text-center">
+                {% if product.marking_required %}
+                  {% set marking_class = product.marking_status == 'filled' ? 'btn-success' : (product.marking_status == 'partial' ? 'btn-warning' : 'btn-danger') %}
+                  {% set marking_text = product.marking_status == 'filled' ? text_marking_filled : (product.marking_status == 'partial' ? text_marking_partial : text_marking_empty) %}
+                  <button type="button" class="btn btn-sm {{ marking_class }} robokassa-marking-button"
+                          data-order-product-id="{{ product.order_product_id }}"
+                          data-label-empty="{{ text_marking_empty }}"
+                          data-label-partial="{{ text_marking_partial }}"
+                          data-label-filled="{{ text_marking_filled }}">
+                    <i class="fas fa-barcode"></i> <span class="robokassa-marking-status">{{ marking_text }}</span>
+                  </button>
+                {% else %}
+                  {{ text_marking_not_required }}
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="robokassa-marking-modal" tabindex="-1" aria-labelledby="robokassa-marking-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="robokassa-marking-title"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="robokassa-marking-fields"></div>
+        <div id="robokassa-marking-message" class="mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">×</button>
+        <button type="button" class="btn btn-primary" id="robokassa-marking-save">{{ button_marking_save }}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript">
+window.robokassaMarking = {
+  getUrl: {{ marking_get_url|json_encode|raw }},
+  saveUrl: {{ marking_save_url|json_encode|raw }},
+  unitLabel: {{ marking_unit|json_encode|raw }},
+  loadError: {{ error_marking_load|json_encode|raw }},
+  saveError: {{ error_marking_save|json_encode|raw }}
+};
+</script>
+<script src="extension/robokassa/admin/view/javascript/robokassa/marking.js" type="text/javascript"></script>
