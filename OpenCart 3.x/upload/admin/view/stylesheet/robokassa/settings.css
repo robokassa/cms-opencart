@@ -1,0 +1,109 @@
+.robokassa-settings {
+  --rk-bg: #f3f6fa;
+  --rk-card: #fff;
+  --rk-ink: #111827;
+  --rk-muted: #667085;
+  --rk-line: #e4e9f0;
+  --rk-primary: #2563eb;
+  --rk-primary-dark: #1d4ed8;
+  --rk-success: #168759;
+  background: var(--rk-bg);
+  min-height: 100vh;
+}
+
+.robokassa-settings .robokassa-page-header { background: #fff; border-bottom: 1px solid var(--rk-line); margin-bottom: 0; }
+.robokassa-settings .container-fluid { max-width: 1240px; }
+.robokassa-settings .robokassa-header-actions { display: flex; gap: 8px; }
+.robokassa-settings .btn { border-radius: 9px; font-weight: 600; padding: 9px 14px; }
+.robokassa-settings .btn-primary { background: linear-gradient(135deg, var(--rk-primary), var(--rk-primary-dark)); border: 0; box-shadow: 0 8px 18px rgba(37, 99, 235, .22); }
+
+.robokassa-hero { align-items: center; background: linear-gradient(135deg, #fff 0%, #f8fbff 65%, #edf4ff 100%); border: 1px solid var(--rk-line); border-radius: 20px; box-shadow: 0 18px 40px -34px rgba(15, 23, 42, .55); display: flex; justify-content: space-between; margin: 24px 0 16px; padding: 24px 28px; }
+.robokassa-hero__brand { align-items: center; display: flex; gap: 20px; }
+.robokassa-hero__logo { align-items: center; background: #111; border-radius: 15px; display: flex; height: 62px; justify-content: center; padding: 14px; width: 160px; }
+.robokassa-hero__logo img { filter: invert(1); max-width: 132px; }
+.robokassa-hero h2 { color: var(--rk-ink); font-size: 24px; font-weight: 700; margin: 0 0 5px; }
+.robokassa-hero p { color: var(--rk-muted); margin: 0; }
+.robokassa-master-switch, .robokassa-toggle { align-items: center; cursor: pointer; display: inline-flex; gap: 10px; margin: 0; }
+.robokassa-master-switch input[type="checkbox"], .robokassa-toggle input[type="checkbox"] { height: 1px; opacity: 0; position: absolute; width: 1px; }
+.robokassa-switch { background: #cbd5e1; border-radius: 999px; display: inline-block; height: 26px; position: relative; transition: .2s ease; width: 46px; }
+.robokassa-switch:after { background: #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(15, 23, 42, .28); content: ""; height: 20px; left: 3px; position: absolute; top: 3px; transition: .2s ease; width: 20px; }
+input:checked + .robokassa-switch { background: var(--rk-primary); }
+input:checked + .robokassa-switch:after { transform: translateX(20px); }
+
+.robokassa-nav { display: grid; gap: 10px; grid-template-columns: repeat(5, 1fr); margin-bottom: 16px; }
+.robokassa-nav__item { align-items: center; background: rgba(255,255,255,.82); border: 1px solid var(--rk-line); border-radius: 14px; color: var(--rk-ink); display: flex; gap: 12px; min-height: 76px; padding: 14px; text-align: left; transition: .18s ease; }
+.robokassa-nav__item:hover { border-color: #bfd1f8; box-shadow: 0 12px 25px -22px rgba(37, 99, 235, .8); transform: translateY(-1px); }
+.robokassa-nav__item.is-active { background: linear-gradient(135deg, var(--rk-primary), var(--rk-primary-dark)); border-color: transparent; box-shadow: 0 14px 28px -18px rgba(37, 99, 235, .8); color: #fff; }
+.robokassa-nav__item i { font-size: 20px; width: 24px; }
+.robokassa-nav__item strong, .robokassa-nav__item small { display: block; }
+.robokassa-nav__item strong { font-size: 14px; }
+.robokassa-nav__item small { margin-top: 3px; opacity: .72; }
+
+.robokassa-tab { display: none; }
+.robokassa-tab.is-active { display: block; }
+.robokassa-card { background: var(--rk-card); border: 1px solid var(--rk-line); border-radius: 20px; box-shadow: 0 18px 42px -35px rgba(15, 23, 42, .65); margin-bottom: 18px; padding: 28px; }
+.robokassa-card--compact { padding: 24px 28px; }
+.robokassa-card__header { align-items: flex-start; display: flex; gap: 20px; justify-content: space-between; margin-bottom: 24px; }
+.robokassa-card__header h3 { color: var(--rk-ink); font-size: 20px; font-weight: 700; margin: 0 0 5px; }
+.robokassa-card__header p { color: var(--rk-muted); margin: 0; }
+.robokassa-badge, .robokassa-availability { background: #eef2f7; border-radius: 999px; color: #526071; display: inline-flex; font-size: 12px; font-weight: 600; padding: 6px 10px; white-space: nowrap; }
+.robokassa-badge.is-success, .robokassa-availability.is-available { background: #e9f8f1; color: var(--rk-success); }
+.robokassa-badge.is-warning { background: #fff5da; color: #9a6700; }
+.robokassa-availability.is-unavailable { background: #fff0f0; color: #c03636; }
+
+.robokassa-form-grid { display: grid; gap: 20px 24px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.robokassa-form-grid--single { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.robokassa-field { min-width: 0; }
+.robokassa-field--wide { grid-column: 1 / -1; }
+.robokassa-field label { color: #344054; display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px; }
+.robokassa-field.required > label:after { color: #dc3545; content: " *"; }
+.robokassa-field small { color: var(--rk-muted); display: block; margin-top: 6px; }
+.robokassa-settings .form-control { border: 1px solid #d7dee8; border-radius: 10px; box-shadow: none; height: 42px; padding: 9px 12px; }
+.robokassa-settings .form-control:focus { border-color: #87aaf5; box-shadow: 0 0 0 3px rgba(37, 99, 235, .1); }
+.robokassa-field.is-hidden { display: none; }
+
+.robokassa-url-list { display: grid; gap: 10px; }
+.robokassa-url-list > div { align-items: center; background: #f8fafc; border: 1px solid var(--rk-line); border-radius: 11px; display: grid; gap: 12px; grid-template-columns: 130px 1fr 38px; padding: 10px 12px; }
+.robokassa-url-list span { color: #344054; font-weight: 600; }
+.robokassa-url-list small { color: var(--rk-muted); font-weight: 500; margin-left: 5px; }
+.robokassa-url-list code { background: transparent; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.robokassa-url-list button { background: #fff; border: 1px solid var(--rk-line); border-radius: 8px; height: 34px; }
+.robokassa-url-list button.is-copied { background: #e9f8f1; border-color: #b7ead3; color: var(--rk-success); }
+
+.robokassa-method-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.robokassa-method-card { align-items: center; border: 1px solid var(--rk-line); border-radius: 15px; display: grid; gap: 14px; grid-template-columns: 46px 1fr auto; padding: 17px; transition: .18s ease; }
+.robokassa-method-card.is-enabled { border-color: #b9cdf8; box-shadow: inset 3px 0 0 var(--rk-primary); }
+.robokassa-method-card__icon { align-items: center; background: #eff4ff; border-radius: 12px; color: var(--rk-primary); display: flex; font-size: 19px; height: 44px; justify-content: center; width: 44px; }
+.robokassa-method-card__title { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+.robokassa-method-card h4 { color: var(--rk-ink); font-size: 15px; font-weight: 700; margin: 0; }
+.robokassa-method-card p { color: var(--rk-muted); font-size: 12px; margin: 5px 0 0; }
+.robokassa-inline-note { align-items: flex-start; background: #f5f8ff; border-radius: 12px; color: #4b5f82; display: flex; gap: 10px; margin-top: 18px; padding: 13px 15px; }
+.robokassa-inline-note i { color: var(--rk-primary); margin-top: 2px; }
+
+.robokassa-widget-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.robokassa-subcard { background: #f8fafc; border: 1px solid var(--rk-line); border-radius: 16px; padding: 22px; }
+.robokassa-subcard--dark { background: #f5f7fb; }
+.robokassa-subcard h4 { color: var(--rk-ink); font-size: 16px; font-weight: 700; margin: 0 0 20px; }
+.robokassa-subcard h4 i { color: var(--rk-primary); margin-right: 7px; }
+.robokassa-toggle--labeled strong { color: #344054; font-size: 13px; }
+.robokassa-language-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.robokassa-language-grid label { align-items: center; background: #f8fafc; border-radius: 10px; display: grid; gap: 12px; grid-template-columns: 1fr 100px; margin: 0; padding: 10px 12px; }
+.robokassa-language-grid label span { margin: 0; }
+
+.robokassa-savebar { align-items: center; background: rgba(255,255,255,.94); border: 1px solid var(--rk-line); border-radius: 15px; bottom: 14px; box-shadow: 0 18px 35px -24px rgba(15, 23, 42, .55); color: var(--rk-muted); display: flex; justify-content: space-between; margin: 6px 0 28px; padding: 12px 14px 12px 18px; position: sticky; z-index: 20; }
+.robokassa-savebar i { margin-right: 5px; }
+
+@media (max-width: 1000px) {
+  .robokassa-nav { grid-template-columns: repeat(3, 1fr); }
+  .robokassa-method-grid, .robokassa-widget-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .robokassa-hero, .robokassa-card__header, .robokassa-savebar { align-items: flex-start; flex-direction: column; }
+  .robokassa-hero__brand { align-items: flex-start; flex-direction: column; }
+  .robokassa-nav { grid-template-columns: 1fr; }
+  .robokassa-form-grid, .robokassa-form-grid--single { grid-template-columns: 1fr; }
+  .robokassa-url-list > div { grid-template-columns: 1fr 38px; }
+  .robokassa-url-list > div > span { grid-column: 1 / -1; }
+  .robokassa-language-grid { grid-template-columns: 1fr; }
+}

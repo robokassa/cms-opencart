@@ -14,14 +14,18 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $this->load->model('localisation/language');
         $this->load->model('extension/payment/robokassa');
         $this->model_extension_payment_robokassa->installMarkingTables();
+        $this->installPaymentExtensions();
         $this->registerMarkingEvents();
+
+        $this->document->addStyle('view/stylesheet/robokassa/settings.css');
+        $this->document->addScript('view/javascript/robokassa/settings.js');
 
         if (($this->request->server['REQUEST_METHOD'] == 'POST') && $this->validate()) {
             $is_update_request = isset($this->request->post['robokassa_action']) && $this->request->post['robokassa_action'] === 'update_methods';
             $methods_initialized = (int)$this->config->get('payment_robokassa_methods_initialized') === 1;
             $is_first_sync = !$methods_initialized;
 
-            $this->model_setting_setting->editSetting('payment_robokassa', $this->request->post);
+            $this->saveUnifiedSettings($this->request->post);
 
             if ($is_update_request || $is_first_sync) {
                 $merchant_login = trim((string)$this->request->post['payment_robokassa_login']);
@@ -36,7 +40,8 @@ class ControllerExtensionPaymentRobokassa extends Controller
 
                 $this->model_setting_setting->editSetting('payment_robokassa_methods', array(
                     'payment_robokassa_methods_login' => $merchant_login,
-                    'payment_robokassa_methods_initialized' => 1
+                    'payment_robokassa_methods_initialized' => 1,
+                    'payment_robokassa_methods_aliases' => $aliases
                 ));
             }
 
@@ -363,6 +368,54 @@ class ControllerExtensionPaymentRobokassa extends Controller
             $data['payment_robokassa_widget_status'] = $this->config->get('payment_robokassa_widget_status');
         }
 
+        $widget_defaults = array(
+            'payment_robokassa_widget_bnpl_theme' => 'light',
+            'payment_robokassa_widget_bnpl_size' => 'm',
+            'payment_robokassa_widget_bnpl_show_logo' => 1,
+            'payment_robokassa_widget_bnpl_border_radius' => '50',
+            'payment_robokassa_widget_bnpl_has_second_line' => 1,
+            'payment_robokassa_widget_bnpl_description_position' => 'right',
+            'payment_robokassa_widget_credit_theme' => 'dark',
+            'payment_robokassa_widget_credit_size' => 'm',
+            'payment_robokassa_widget_credit_show_logo' => 1,
+            'payment_robokassa_widget_credit_border_radius' => '12',
+            'payment_robokassa_widget_credit_has_second_line' => 0,
+            'payment_robokassa_widget_credit_description_position' => 'right'
+        );
+
+        foreach ($widget_defaults as $key => $default) {
+            $data[$key] = $this->getSettingValue($key, $default);
+        }
+
+        $available_aliases = $this->config->get('payment_robokassa_methods_aliases');
+        $aliases_known = is_array($available_aliases)
+            && (int)$this->config->get('payment_robokassa_methods_initialized') === 1
+            && trim((string)$this->config->get('payment_robokassa_methods_login')) === trim((string)$this->config->get('payment_robokassa_login'));
+
+        if (!$aliases_known) {
+            $available_aliases = array();
+        }
+
+        $available_aliases = array_map('strtolower', $available_aliases);
+        $method_definitions = array(
+            array('code' => 'credit', 'alias' => 'otp', 'title' => 'Кредит и рассрочка', 'description' => 'Оплата заказа в кредит или рассрочку через OTP.'),
+            array('code' => 'mokka', 'alias' => 'mokka', 'title' => 'Mokka', 'description' => 'Покупка сейчас с оплатой частями через Mokka.'),
+            array('code' => 'podeli', 'alias' => 'podeli', 'title' => 'Подели', 'description' => 'Разделение стоимости заказа на несколько платежей.'),
+            array('code' => 'sbp', 'alias' => 'sbp', 'title' => 'СБП', 'description' => 'Быстрая оплата по QR-коду через Систему быстрых платежей.'),
+            array('code' => 'yandex_split', 'alias' => 'yandexpaysplit', 'title' => 'Яндекс Сплит', 'description' => 'Оплата заказа частями с помощью Яндекс Сплит.')
+        );
+
+        $data['robokassa_payment_methods'] = array();
+
+        foreach ($method_definitions as $method) {
+            $setting_key = 'payment_robokassa_' . $method['code'] . '_status';
+            $method['setting_key'] = $setting_key;
+            $method['enabled'] = (bool)$this->getSettingValue($setting_key, 0);
+            $method['availability_known'] = $aliases_known;
+            $method['available'] = !$aliases_known || in_array($method['alias'], $available_aliases, true);
+            $data['robokassa_payment_methods'][] = $method;
+        }
+
         if (isset($this->request->post['payment_robokassa_status_iframe'])) {
             $data['payment_robokassa_status_iframe'] = $this->request->post['payment_robokassa_status_iframe'];
         } else {
@@ -393,6 +446,84 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $data['footer'] = $this->load->controller('common/footer');
 
         $this->response->setOutput($this->load->view('extension/payment/robokassa', $data));
+    }
+
+    private function getSettingValue($key, $default = '')
+    {
+        if (isset($this->request->post[$key])) {
+            return $this->request->post[$key];
+        }
+
+        $value = $this->config->get($key);
+
+        return ($value === null || $value === '') ? $default : $value;
+    }
+
+    private function saveUnifiedSettings(array $settings)
+    {
+        $child_codes = array(
+            'payment_robokassa_credit',
+            'payment_robokassa_mokka',
+            'payment_robokassa_podeli',
+            'payment_robokassa_sbp',
+            'payment_robokassa_yandex_split',
+            'payment_robokassa_widget'
+        );
+        $grouped_settings = array();
+
+        foreach ($child_codes as $code) {
+            $grouped_settings[$code] = array();
+        }
+
+        $main_settings = array();
+
+        foreach ($settings as $key => $value) {
+            if (strpos($key, 'payment_robokassa_') !== 0) {
+                continue;
+            }
+
+            $child_setting = false;
+
+            foreach ($child_codes as $code) {
+                if (strpos($key, $code . '_') === 0) {
+                    $grouped_settings[$code][$key] = $value;
+                    $child_setting = true;
+                    break;
+                }
+            }
+
+            if (!$child_setting) {
+                $main_settings[$key] = $value;
+            }
+        }
+
+        $this->model_setting_setting->editSetting('payment_robokassa', $main_settings);
+
+        foreach ($grouped_settings as $code => $values) {
+            $existing_values = $this->model_setting_setting->getSetting($code);
+            $this->model_setting_setting->editSetting($code, array_merge($existing_values, $values));
+        }
+    }
+
+    private function installPaymentExtensions()
+    {
+        $this->load->model('setting/extension');
+        $installed_codes = $this->model_setting_extension->getInstalled('payment');
+
+        $robokassa_extensions = array(
+            'robokassa_credit',
+            'robokassa_mokka',
+            'robokassa_podeli',
+            'robokassa_sbp',
+            'robokassa_widget',
+            'robokassa_yandex_split'
+        );
+
+        foreach ($robokassa_extensions as $code) {
+            if (!in_array($code, $installed_codes, true)) {
+                $this->model_setting_extension->install('payment', $code);
+            }
+        }
     }
 
     private function registerMarkingEvents()
@@ -682,12 +813,19 @@ class ControllerExtensionPaymentRobokassa extends Controller
 	{
 		$this->load->model('extension/payment/robokassa');
 		$this->model_extension_payment_robokassa->installMarkingTables();
+		$this->installPaymentExtensions();
 		$this->registerMarkingEvents();
 		$this->sendPulseStatusChange('enabled');
 	}
 
 	public function uninstall()
 	{
+		$this->load->model('setting/extension');
+
+		foreach (array('robokassa_credit', 'robokassa_mokka', 'robokassa_podeli', 'robokassa_sbp', 'robokassa_widget', 'robokassa_yandex_split') as $code) {
+			$this->model_setting_extension->uninstall('payment', $code);
+		}
+
 		$this->load->model('setting/event');
 		$this->model_setting_event->deleteEventByCode('robokassa_marking_product_form');
 		$this->model_setting_event->deleteEventByCode('robokassa_marking_product_edit');
