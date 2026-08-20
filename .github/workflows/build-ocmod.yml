@@ -49,14 +49,14 @@ jobs:
         run: |
           mkdir -p release/opencart-3
           cd 'OpenCart 3.x'
-          zip -r ../release/opencart-3/robokassa3.ocmod.zip upload install.xml README.md -x '*.DS_Store'
+          zip -r ../release/opencart-3/robokassa-opencart-3.ocmod.zip upload install.xml README.md -x '*.DS_Store'
 
       - name: Build OpenCart 4 archive
         shell: bash
         run: |
           mkdir -p release/opencart-4
           cd 'OpenCart 4.x/upload/robokassa'
-          zip -r ../../../release/opencart-4/robokassa.ocmod.zip admin catalog system install.json README.md -x '*.DS_Store'
+          zip -r ../../../release/opencart-4/robokassa-opencart-4.ocmod.zip admin catalog system install.json README.md -x '*.DS_Store'
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -67,5 +67,5 @@ jobs:
           make_latest: true
           fail_on_unmatched_files: true
           files: |
-            release/opencart-3/robokassa3.ocmod.zip
-            release/opencart-4/robokassa.ocmod.zip
+            release/opencart-3/robokassa-opencart-3.ocmod.zip
+            release/opencart-4/robokassa-opencart-4.ocmod.zip
