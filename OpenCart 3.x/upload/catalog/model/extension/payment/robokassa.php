@@ -285,6 +285,10 @@ class ModelExtensionPaymentRobokassa extends Model {
         $this->load->model('checkout/order');
         $order = $this->model_checkout_order->getOrder($order_id);
 
+        if (!$order) {
+            return false;
+        }
+
         $products = $this->getOrderProducts($order_id);
 
         $receipt_items = array();
@@ -330,8 +334,14 @@ class ModelExtensionPaymentRobokassa extends Model {
             'Receipt' => json_encode(array('items' => $receipt_items)),
         );
 
-        $merchant_login = $this->config->get('payment_robokassa_login');
-        $password1 = $this->config->get('payment_robokassa_password_1');
+        $merchant_login = (string)$this->config->get('payment_robokassa_login');
+        $password1 = $this->config->get('payment_robokassa_test')
+            ? (string)$this->config->get('payment_robokassa_test_password_1')
+            : (string)$this->config->get('payment_robokassa_password_1');
+
+        if ($merchant_login === '' || $password1 === '') {
+            return false;
+        }
 
         $signature_value = md5("{$merchant_login}:{$request_data['OutSum']}:{$request_data['InvoiceID']}:{$request_data['Receipt']}:{$password1}");
         $request_data['SignatureValue'] = $signature_value;
@@ -346,8 +356,11 @@ class ModelExtensionPaymentRobokassa extends Model {
             CURLOPT_POSTFIELDS => http_build_query($request_data),
         ));
         $response = curl_exec($curl);
+        $curl_error = curl_errno($curl);
+        $http_code = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
 
+        return !$curl_error && is_string($response) && $http_code >= 200 && $http_code < 400;
     }
 
     function robokassa_hold_cancel($order_id)
@@ -355,8 +368,9 @@ class ModelExtensionPaymentRobokassa extends Model {
         $this->load->model('checkout/order');
         $order = $this->model_checkout_order->getOrder($order_id);
 
-        $message = 'Robokassa: Платеж успешно отменен.';
-        $this->model_checkout_order->addOrderHistory($order_id, 7, $message, true);
+        if (!$order) {
+            return false;
+        }
 
         $request_data = array(
             'MerchantLogin' => $this->config->get('payment_robokassa_login'),
@@ -364,8 +378,14 @@ class ModelExtensionPaymentRobokassa extends Model {
             'OutSum' => $order['total'],
         );
 
-        $merchant_login = $this->config->get('payment_robokassa_login');
-        $password1 = $this->config->get('payment_robokassa_password_1');
+        $merchant_login = (string)$this->config->get('payment_robokassa_login');
+        $password1 = $this->config->get('payment_robokassa_test')
+            ? (string)$this->config->get('payment_robokassa_test_password_1')
+            : (string)$this->config->get('payment_robokassa_password_1');
+
+        if ($merchant_login === '' || $password1 === '') {
+            return false;
+        }
 
         $signature_value = md5("{$merchant_login}::{$request_data['InvoiceID']}:{$password1}");
         $request_data['SignatureValue'] = $signature_value;
@@ -379,8 +399,11 @@ class ModelExtensionPaymentRobokassa extends Model {
             CURLOPT_POSTFIELDS => http_build_query($request_data),
         ));
         $response = curl_exec($curl);
+        $curl_error = curl_errno($curl);
+        $http_code = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
 
+        return !$curl_error && is_string($response) && $http_code >= 200 && $http_code < 400;
     }
 
 }

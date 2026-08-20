@@ -134,6 +134,9 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $data['entry_fail_url'] = $this->language->get('entry_fail_url');
         $data['entry_test'] = $this->language->get('entry_test');
         $data['entry_order_status'] = $this->language->get('entry_order_status');
+        $data['entry_hold_pending_status'] = $this->language->get('entry_hold_pending_status');
+        $data['entry_hold_confirm_status'] = $this->language->get('entry_hold_confirm_status');
+        $data['entry_hold_cancel_status'] = $this->language->get('entry_hold_cancel_status');
         $data['entry_geo_zone'] = $this->language->get('entry_geo_zone');
         $data['entry_status'] = $this->language->get('entry_status');
         $data['entry_sort_order'] = $this->language->get('entry_sort_order');
@@ -145,6 +148,7 @@ class Robokassa extends \Opencart\System\Engine\Controller
         $data['help_marking'] = $this->language->get('help_marking');
         $data['help_iframe'] = $this->language->get('help_iframe');
         $data['help_hold'] = $this->language->get('help_hold');
+        $data['help_hold_statuses'] = $this->language->get('help_hold_statuses');
         $data['help_password3'] = $this->language->get('help_password3');
 
         $data['action'] = $this->url->link('extension/robokassa/payment/robokassa', 'user_token=' . $this->session->data['user_token'], true);
@@ -316,6 +320,9 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $this->load->model('localisation/order_status');
         $data['order_statuses'] = $this->model_localisation_order_status->getOrderStatuses();
+        $data['payment_robokassa_hold_pending_status_id'] = (int)($this->request->post['payment_robokassa_hold_pending_status_id'] ?? ($this->config->get('payment_robokassa_hold_pending_status_id') ?: 1));
+        $data['payment_robokassa_hold_confirm_status_id'] = (int)($this->request->post['payment_robokassa_hold_confirm_status_id'] ?? ($this->config->get('payment_robokassa_hold_confirm_status_id') ?: 2));
+        $data['payment_robokassa_hold_cancel_status_id'] = (int)($this->request->post['payment_robokassa_hold_cancel_status_id'] ?? ($this->config->get('payment_robokassa_hold_cancel_status_id') ?: 7));
         $data['payment_robokassa_refund_status_id'] = (int)($this->request->post['payment_robokassa_refund_status_id'] ?? ($this->config->get('payment_robokassa_refund_status_id') ?: 11));
 
         $data['payment_robokassa_geo_zone_id'] = $this->request->post['payment_robokassa_geo_zone_id'] ?? $this->config->get('payment_robokassa_geo_zone_id');
@@ -731,6 +738,24 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         if (empty($this->request->post['payment_robokassa_password_2'])) {
             $this->error['e_password2'] = $this->language->get('error_password2');
+        }
+
+        if (!empty($this->request->post['payment_robokassa_status_hold'])) {
+            $status_ids = [
+                (int)($this->request->post['payment_robokassa_hold_pending_status_id'] ?? 0),
+                (int)($this->request->post['payment_robokassa_hold_confirm_status_id'] ?? 0),
+                (int)($this->request->post['payment_robokassa_hold_cancel_status_id'] ?? 0)
+            ];
+
+            if (in_array(0, $status_ids, true) || count(array_unique($status_ids)) !== 3) {
+                $this->error['warning'] = $this->language->get('error_hold_statuses');
+            } else {
+                $query = $this->db->query("SELECT COUNT(DISTINCT `order_status_id`) AS total FROM `" . DB_PREFIX . "order_status` WHERE `order_status_id` IN (" . implode(',', $status_ids) . ")");
+
+                if ((int)$query->row['total'] !== 3) {
+                    $this->error['warning'] = $this->language->get('error_hold_statuses');
+                }
+            }
         }
 
         return !$this->error;

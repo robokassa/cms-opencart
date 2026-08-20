@@ -58,12 +58,14 @@ class ResultHold extends \Opencart\System\Engine\Controller
         $state = $payload['data']['state'] ?? null;
 
         if ($state === 'HOLD') {
-            $this->updateOrderStatus($payload, 1, 'Robokassa: Платеж захолдирован.');
+            $status_id = (int)($this->config->get('payment_robokassa_hold_pending_status_id') ?: 1);
+            $this->updateOrderStatus($payload, $status_id, 'Robokassa: Платеж захолдирован.');
             return;
         }
 
         if ($state === 'OK') {
-            $this->updateOrderStatus($payload, 2, 'Robokassa: Платеж успешно подтвержден.');
+            $status_id = (int)($this->config->get('payment_robokassa_hold_confirm_status_id') ?: 2);
+            $this->updateOrderStatus($payload, $status_id, 'Robokassa: Платеж успешно подтвержден.');
         }
     }
 

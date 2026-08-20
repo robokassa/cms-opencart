@@ -185,14 +185,14 @@ class Robokassa extends \Opencart\System\Engine\Model
         $out_sum = $this->getOutSum($order_id);
         $signature = md5($merchant . '::' . $order_id . ':' . $password1);
 
-        $response = $this->post('https://auth.robokassa.ru/Merchant/Payment/Cancel', [
+        $this->post('https://auth.robokassa.ru/Merchant/Payment/Cancel', [
             'MerchantLogin'  => $merchant,
             'OutSum'         => $out_sum,
             'InvoiceID'      => $order_id,
             'SignatureValue' => $signature,
         ]);
 
-        return stripos($response, 'OK') !== false;
+        return true;
     }
 
     public function holdConfirm(int $order_id): bool
@@ -213,7 +213,7 @@ class Robokassa extends \Opencart\System\Engine\Model
         }
 
         $signature = md5($merchant . ':' . $out_sum . ':' . $order_id . ':' . $receipt . ':' . $password1);
-        $response = $this->post('https://auth.robokassa.ru/Merchant/Payment/Confirm', [
+        $this->post('https://auth.robokassa.ru/Merchant/Payment/Confirm', [
             'MerchantLogin'  => $merchant,
             'OutSum'         => $out_sum,
             'InvoiceID'      => $order_id,
@@ -221,7 +221,7 @@ class Robokassa extends \Opencart\System\Engine\Model
             'SignatureValue' => $signature,
         ]);
 
-        return stripos($response, 'OK') !== false;
+        return true;
     }
 
     public function sendSecondCheck(int $order_id): bool
@@ -533,11 +533,17 @@ class Robokassa extends \Opencart\System\Engine\Model
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
         $result = curl_exec($ch);
+        $http_code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
         if ($result === false) {
             $error = curl_error($ch);
             curl_close($ch);
             throw new \RuntimeException($error);
+        }
+
+        if ($http_code < 200 || $http_code >= 400) {
+            curl_close($ch);
+            throw new \RuntimeException('Robokassa returned HTTP ' . $http_code);
         }
 
         curl_close($ch);

@@ -532,7 +532,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
                     $order->update_status('on-hold');*/
                     $order_id = $json_data['data']['invId'];
                     $order_info = $this->model_checkout_order->getOrder($order_id);
-                    $new_order_status_id = 1; // Идентификатор статуса "Pending"
+                    $new_order_status_id = (int)($this->config->get('payment_robokassa_hold_pending_status_id') ?: 1);
                     $message = "Robokassa: Платеж захолдирован.";
 
                     if ($order_info['order_status_id'] == 0) {
@@ -548,7 +548,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
                     // Изменяем статус заказа
                     $order_id = $json_data['data']['invId'];
                     $order_info = $this->model_checkout_order->getOrder($order_id);
-                    $new_order_status_id = 2; // Идентификатор статуса "Processing"
+                    $new_order_status_id = (int)($this->config->get('payment_robokassa_hold_confirm_status_id') ?: 2);
                     $message = "Robokassa: Платеж успешно подтвержден.";
 
                     if ($order_info['order_status_id'] == 0) {

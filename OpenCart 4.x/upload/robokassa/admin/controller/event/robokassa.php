@@ -208,7 +208,11 @@ class Robokassa extends \Opencart\System\Engine\Controller
     private function shouldRunHold(int $order_id, int $new_status_id): bool
     {
         if ($order_id <= 0) return false;
-        if ($new_status_id !== 7 && $new_status_id !== 2) return false;
+
+        $confirm_status_id = (int)($this->config->get('payment_robokassa_hold_confirm_status_id') ?: 2);
+        $cancel_status_id = (int)($this->config->get('payment_robokassa_hold_cancel_status_id') ?: 7);
+
+        if ($new_status_id !== $confirm_status_id && $new_status_id !== $cancel_status_id) return false;
         if (!(int)$this->config->get('payment_robokassa_status_hold')) return false;
 
         $order = $this->getOrderRow($order_id);
@@ -216,8 +220,9 @@ class Robokassa extends \Opencart\System\Engine\Controller
         if (!$order) return false;
 
         $old_status_id = (int)$order['order_status_id'];
+        $pending_status_id = (int)($this->config->get('payment_robokassa_hold_pending_status_id') ?: 1);
 
-        if ($old_status_id !== 1) return false;
+        if ($old_status_id !== $pending_status_id) return false;
         if (!$this->isRobokassaOrder($order)) return false;
 
         return true;
@@ -285,28 +290,37 @@ class Robokassa extends \Opencart\System\Engine\Controller
 
         $this->load->model('extension/robokassa/payment/robokassa');
 
+        if ($run_hold) {
+            $cancel_status_id = (int)($this->config->get('payment_robokassa_hold_cancel_status_id') ?: 7);
+            $confirm_status_id = (int)($this->config->get('payment_robokassa_hold_confirm_status_id') ?: 2);
+
+            if ($new_status_id === $cancel_status_id) {
+                if (!$this->model_extension_robokassa_payment_robokassa->holdCancel($order_id)) {
+                    throw new \RuntimeException('Robokassa не отменила захолдированный платеж. Статус заказа не изменен.');
+                }
+
+                return;
+            }
+
+            if ($new_status_id === $confirm_status_id
+                && !$this->model_extension_robokassa_payment_robokassa->holdConfirm($order_id)) {
+                throw new \RuntimeException('Robokassa не подтвердила списание захолдированного платежа. Статус заказа не изменен.');
+            }
+        }
+
         if ($send_second_check) {
             $this->model_extension_robokassa_payment_robokassa->sendSecondCheck($order_id);
-        }
-
-        if (!$run_hold) return;
-
-        if ($new_status_id === 7) {
-            $this->model_extension_robokassa_payment_robokassa->holdCancel($order_id);
-            return;
-        }
-
-        if ($new_status_id === 2) {
-            $this->model_extension_robokassa_payment_robokassa->holdConfirm($order_id);
-            return;
         }
     }
 
     private function injectMessage(int $new_status_id, string $current): string
     {
         $msg = '';
-        if ($new_status_id === 7) $msg = 'Robokassa: Платеж успешно отменен.';
-        if ($new_status_id === 2) $msg = 'Robokassa: Платеж успешно подтвержден.';
+        $cancel_status_id = (int)($this->config->get('payment_robokassa_hold_cancel_status_id') ?: 7);
+        $confirm_status_id = (int)($this->config->get('payment_robokassa_hold_confirm_status_id') ?: 2);
+
+        if ($new_status_id === $cancel_status_id) $msg = 'Robokassa: Платеж успешно отменен.';
+        if ($new_status_id === $confirm_status_id) $msg = 'Robokassa: Платеж успешно подтвержден.';
         if ($msg === '') return $current;
 
         $current = trim($current);

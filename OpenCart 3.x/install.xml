@@ -8,8 +8,37 @@
     <operation>
       <search><![CDATA[$this->model_checkout_order->addOrderHistory($order_id, $this->request->post['order_status_id'], $this->request->post['comment'], $this->request->post['notify'], $this->request->post['override']);]]></search>
       <add position="before"><![CDATA[
+        $robokassa_hold_pending_status_id = (int)($this->config->get('payment_robokassa_hold_pending_status_id') ?: 1);
+        $robokassa_hold_confirm_status_id = (int)($this->config->get('payment_robokassa_hold_confirm_status_id') ?: 2);
+        $robokassa_hold_cancel_status_id = (int)($this->config->get('payment_robokassa_hold_cancel_status_id') ?: 7);
+        $robokassa_is_hold_cancel = $this->config->get('payment_robokassa_status_hold') && $order_info['order_status_id'] == $robokassa_hold_pending_status_id && $this->request->post['order_status_id'] == $robokassa_hold_cancel_status_id;
+
+        // Added condition for robokassa_hold_confirm
+        if ($this->config->get('payment_robokassa_status_hold') && $order_info['order_status_id'] == $robokassa_hold_pending_status_id && $this->request->post['order_status_id'] == $robokassa_hold_confirm_status_id) {
+          $this->load->model('extension/payment/robokassa');
+          if (!$this->model_extension_payment_robokassa->robokassa_hold_confirm($order_id)) {
+            $json['error'] = 'Robokassa не подтвердила списание захолдированного платежа. Статус заказа не изменен.';
+            $this->response->addHeader('Content-Type: application/json');
+            $this->response->setOutput(json_encode($json));
+            return;
+          }
+        }
+        // Added condition for robokassa_hold_confirm
+
+        // Added condition for robokassa_hold_cancel
+        if ($robokassa_is_hold_cancel) {
+          $this->load->model('extension/payment/robokassa');
+          if (!$this->model_extension_payment_robokassa->robokassa_hold_cancel($order_id)) {
+            $json['error'] = 'Robokassa не отменила захолдированный платеж. Статус заказа не изменен.';
+            $this->response->addHeader('Content-Type: application/json');
+            $this->response->setOutput(json_encode($json));
+            return;
+          }
+        }
+        // Added condition for robokassa_hold_cancel
+
         // Final check
-        if($order_info['order_status_id'] != $this->request->post['order_status_id'] && strpos((string)$order_info['payment_code'], 'robokassa') === 0 && $this->request->post['order_status_id'] == $this->config->get('payment_robokassa_order_status_id_2check') && $this->config->get('payment_robokassa_fiscal') == 1){
+        if (!$robokassa_is_hold_cancel && $order_info['order_status_id'] != $this->request->post['order_status_id'] && strpos((string)$order_info['payment_code'], 'robokassa') === 0 && $this->request->post['order_status_id'] == $this->config->get('payment_robokassa_order_status_id_2check') && $this->config->get('payment_robokassa_fiscal') == 1){
           $this->load->model('extension/payment/robokassa');
 
           try {
@@ -22,20 +51,6 @@
           }
         }
         // Final check
-
-        // Added condition for robokassa_hold_confirm
-        if ($order_info['order_status_id'] == 1 && $this->request->post['order_status_id'] == 2) {
-          $this->load->model('extension/payment/robokassa');
-          $this->model_extension_payment_robokassa->robokassa_hold_confirm($order_id);
-        }
-        // Added condition for robokassa_hold_confirm
-
-        // Added condition for robokassa_hold_cancel
-        if ($order_info['order_status_id'] == 1 && $this->request->post['order_status_id'] == 7) {
-          $this->load->model('extension/payment/robokassa');
-          $this->model_extension_payment_robokassa->robokassa_hold_cancel($order_id);
-        }
-        // Added condition for robokassa_hold_cancel
       ]]></add>
     </operation>
   </file>
