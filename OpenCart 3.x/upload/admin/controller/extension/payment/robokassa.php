@@ -632,6 +632,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
         $this->load->model('setting/event');
 
         $events = array(
+            'robokassa_admin_menu' => array('admin/view/common/column_left/before', 'extension/payment/robokassa/adminMenu'),
             'robokassa_marking_product_form' => array('admin/view/catalog/product_form/after', 'extension/payment/robokassa/productForm'),
             'robokassa_marking_product_edit' => array('admin/model/catalog/product/editProduct/after', 'extension/payment/robokassa/saveProductMarking'),
             'robokassa_marking_product_add' => array('admin/model/catalog/product/addProduct/after', 'extension/payment/robokassa/saveProductMarking')
@@ -641,6 +642,29 @@ class ControllerExtensionPaymentRobokassa extends Controller
             $this->model_setting_event->deleteEventByCode($code);
             $this->model_setting_event->addEvent($code, $event[0], $event[1]);
         }
+    }
+
+    public function adminMenu(&$route, &$data)
+    {
+        if (!$this->user->hasPermission('access', 'extension/payment/robokassa') || empty($data['menus']) || !is_array($data['menus'])) {
+            return;
+        }
+
+        foreach ($data['menus'] as $menu) {
+            if (isset($menu['id']) && $menu['id'] === 'menu-robokassa') {
+                return;
+            }
+        }
+
+        $robokassa_menu = array(
+            'id' => 'menu-robokassa',
+            'icon' => 'fa-credit-card',
+            'name' => 'Robokassa',
+            'href' => $this->url->link('extension/payment/robokassa', 'user_token=' . $this->session->data['user_token'], true),
+            'children' => array()
+        );
+
+        array_splice($data['menus'], 1, 0, array($robokassa_menu));
     }
 
     public function productForm(&$route, &$data, &$output)
@@ -1217,6 +1241,7 @@ class ControllerExtensionPaymentRobokassa extends Controller
 		}
 
 		$this->load->model('setting/event');
+		$this->model_setting_event->deleteEventByCode('robokassa_admin_menu');
 		$this->model_setting_event->deleteEventByCode('robokassa_marking_product_form');
 		$this->model_setting_event->deleteEventByCode('robokassa_marking_product_edit');
 		$this->model_setting_event->deleteEventByCode('robokassa_marking_product_add');
