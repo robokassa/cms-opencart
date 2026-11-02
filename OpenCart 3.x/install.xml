@@ -1,7 +1,7 @@
 <modification>
   <code>Robokassa</code>
   <name>Robokassa opencart</name>
-  <version>1.3.0</version>
+  <version>1.3.1</version>
   <author>Robokassa</author>
   <link>https://robokassa.com</link>
   <file path="catalog/controller/api/order.php">
@@ -136,6 +136,23 @@
 
           if ($robokassa_widget_payment_code !== '' && isset($method_data[$robokassa_widget_payment_code])) {
             $this->session->data['payment_method'] = $method_data[$robokassa_widget_payment_code];
+          }
+
+          unset($this->session->data['robokassa_widget_payment_code']);
+        }
+      ]]></add>
+    </operation>
+  </file>
+  <file path="catalog/controller/checkout/simplecheckout_payment.php">
+    <operation error="skip">
+      <search><![CDATA[$this->_templateData['checked_code'] = '';]]></search>
+      <add position="after"><![CDATA[
+        if (isset($this->session->data['robokassa_widget_payment_code'])) {
+          $robokassa_widget_payment_code = (string)$this->session->data['robokassa_widget_payment_code'];
+
+          if ($robokassa_widget_payment_code !== '' && isset($method_data[$robokassa_widget_payment_code]) && empty($method_data[$robokassa_widget_payment_code]['dummy'])) {
+            $this->_templateData['payment_method'] = $method_data[$robokassa_widget_payment_code];
+            $this->_templateData['checked_code'] = $robokassa_widget_payment_code;
           }
 
           unset($this->session->data['robokassa_widget_payment_code']);

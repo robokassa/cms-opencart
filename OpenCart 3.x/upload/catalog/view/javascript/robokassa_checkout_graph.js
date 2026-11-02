@@ -1,11 +1,18 @@
 (function () {
     'use strict';
 
+    if (window.__robokassaCheckoutGraphAdapterLoaded) {
+        return;
+    }
+
+    window.__robokassaCheckoutGraphAdapterLoaded = true;
+
     var graphData = null;
     var graphRequest = null;
     var renderTimer = null;
     var scriptLoading = false;
     var styleReady = false;
+    var initializedMethods = null;
 
     function isCheckoutContext() {
         return window.location.href.indexOf('checkout') !== -1
@@ -146,7 +153,7 @@
         markPaymentList(item.input);
 
         if (!container || container.querySelector('.robokassa-checkout-graph')) {
-            return;
+            return false;
         }
 
         var graph = document.createElement('div');
@@ -156,9 +163,11 @@
         graph.innerHTML = '<robokassa-graph merchantLogin="' + escapeAttribute(data.merchant_login) + '" outSum="' + escapeAttribute(data.out_sum) + '" paymentMethod="' + escapeAttribute(item.paymentMethod) + '"></robokassa-graph>';
 
         container.appendChild(graph);
+
+        return true;
     }
 
-    function syncGraphVisibility() {
+    function syncGraphVisibility(forceInitialization) {
         var graphs = document.querySelectorAll('.robokassa-checkout-graph[data-robokassa-graph-for]');
         var activeMethods = [];
 
@@ -186,7 +195,12 @@
             }
         }
 
-        if (typeof window.initRobokassaGraphs === 'function' && activeMethods.length) {
+        var methodsSignature = activeMethods.join('|');
+
+        if (typeof window.initRobokassaGraphs === 'function'
+            && activeMethods.length
+            && (forceInitialization || initializedMethods !== methodsSignature)) {
+            initializedMethods = methodsSignature;
             window.initRobokassaGraphs(activeMethods.length === 1 ? activeMethods[0] : activeMethods);
         }
     }
@@ -239,16 +253,23 @@
             return;
         }
 
+        if (document.querySelector('.robokassa-checkout-graph:not([data-robokassa-graph-for])')) {
+            return;
+        }
+
         loadGraphData(function (data) {
             var items = findPaymentInputs(data.methods || {});
+            var graphCreated = false;
 
             for (var i = 0; i < items.length; i++) {
-                ensureGraphContainer(items[i], data);
+                graphCreated = ensureGraphContainer(items[i], data) || graphCreated;
             }
 
             ensureStyle();
             bindPaymentInputs();
-            ensureGraphScript(data, syncGraphVisibility);
+            ensureGraphScript(data, function () {
+                syncGraphVisibility(graphCreated);
+            });
         });
     }
 
@@ -276,12 +297,11 @@
         }
     }, true);
 
-    if (window.MutationObserver && window.location.href.indexOf('checkout') !== -1) {
-        var observer = new MutationObserver(scheduleRender);
-
-        observer.observe(document.documentElement, {
-            childList: true,
-            subtree: true
+    if (window.jQuery && window.location.href.indexOf('simplecheckout') !== -1) {
+        window.jQuery(document).ajaxComplete(function (event, xhr, settings) {
+            if (settings && settings.url && settings.url.indexOf('checkout/simplecheckout') !== -1) {
+                scheduleRender();
+            }
         });
     }
 })();
